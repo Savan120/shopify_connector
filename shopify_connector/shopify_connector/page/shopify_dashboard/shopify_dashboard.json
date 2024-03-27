@@ -1,0 +1,23 @@
+{
+ "content": null,
+ "creation": "2024-03-15 16:30:26.508333",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2024-03-15 16:50:39.139785",
+ "modified_by": "Administrator",
+ "module": "Shopify Connector",
+ "name": "shopify-dashboard",
+ "owner": "Administrator",
+ "page_name": "shopify-dashboard",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Import "
+}

@@ -1,0 +1,134 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "SC.#####",
+ "creation": "2024-02-20 10:36:24.402550",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_shopify",
+  "api_key",
+  "api_secret",
+  "access_token",
+  "shop_url",
+  "uom",
+  "sales_order_series",
+  "column_break_suda",
+  "company",
+  "delivery_after_days",
+  "warehouse",
+  "tax_account",
+  "f_n_f_account"
+ ],
+ "fields": [
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Data",
+   "label": "API Key",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "fieldname": "api_secret",
+   "fieldtype": "Data",
+   "label": "API Secret",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "fieldname": "access_token",
+   "fieldtype": "Data",
+   "label": "Access Token",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "fieldname": "shop_url",
+   "fieldtype": "Data",
+   "label": "Shop URL",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_shopify",
+   "fieldtype": "Check",
+   "label": "Enable Shopify"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "sales_order_series",
+   "fieldtype": "Select",
+   "label": "Sales Order Series",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "SAL-ORD-.YYYY.-"
+  },
+  {
+   "fieldname": "column_break_suda",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Company"
+  },
+  {
+   "fieldname": "delivery_after_days",
+   "fieldtype": "Int",
+   "label": "Delivery After (Days)",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Company"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "tax_account",
+   "fieldtype": "Link",
+   "label": "Tax Account",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Account"
+  },
+  {
+   "fieldname": "f_n_f_account",
+   "fieldtype": "Link",
+   "label": "Freight and Forwarding Account",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Account"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2024-03-11 14:41:21.497688",
+ "modified_by": "Administrator",
+ "module": "Shopify Connector",
+ "name": "Shopify Connector Setting",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
