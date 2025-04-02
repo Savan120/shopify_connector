@@ -27,6 +27,10 @@ def receive_shopify_order():
     if frappe.db.exists("Sales Order", {"shopify_id": order_number}):
         return "Order already exists."
     
+    if not customer_name:
+        frappe.throw(_(f"Customer name is missing in the order id {order_number}."))
+        
+    
     sales_order = frappe.new_doc("Sales Order")
     sales_order.customer = customer_name.strip() or "Guest"
     sales_order.shopify_id = order_number
@@ -36,7 +40,6 @@ def receive_shopify_order():
     sales_order.delivery_date = frappe.utils.add_days(created_date, settings.delivery_after_days or 7)
     
     for item in items:
-        print(f"\n\n\n\n\ item: {item}")
         product_id = item.get("product_id")
         item_name = item.get("name")
         
@@ -71,3 +74,42 @@ def receive_shopify_order():
     
     frappe.msgprint(_("Sales Order created for order number: {0}").format(order_number))
     return "success"
+
+
+@frappe.whitelist(allow_guest=True)
+def customer_creation():
+    order_data = frappe.local.request.get_json()
+    if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
+        cus = frappe.new_doc("Customer")
+        cus.shopify_email = order_data.get("email")
+        cus.customer_name = order_data.get("first_name", "") + " " + order_data.get("last_name", "")
+        cus.default_currency = order_data.get("currency")
+        cus.flags.ignore_mandatory = True
+        cus.insert(ignore_permissions=True)
+        cus.save()
+        customer = frappe.get_doc("Customer", cus.name)
+        if order_data.get("default_address"):
+            address = order_data.get("default_address")
+            cus_address = frappe.new_doc("Address")
+            cus_address.address_title = order_data.get("first_name", "") + " " + order_data.get("last_name", "")
+            cus_address.address_type = "Shipping"
+            cus_address.address_line1 = address.get("address1")
+            cus_address.address_line2 = address.get("address2")
+            cus_address.city = address.get("city")
+            cus_address.state = address.get("province")
+            cus_address.country = address.get("country")
+            cus_address.postal_code = address.get("zip")
+            cus_address.phone = address.get("phone")
+            
+            cus_address.append("links", {
+                "link_doctype": "Customer",
+                "link_name": cus.name,
+            })
+            cus_address.flags.ignore_mandatory = True
+            cus_address.insert(ignore_permissions=True)
+            cus_address.save()
+        
+        cus.save()
+        frappe.msgprint(_("Customer created for email: {0}").format(order_data.get("email")))
+    else:
+        frappe.msgprint(_("Customer already exists for email: {0}").format(order_data.get("email")))
