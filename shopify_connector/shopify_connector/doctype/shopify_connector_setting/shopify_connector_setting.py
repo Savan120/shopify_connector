@@ -203,10 +203,11 @@ def get_order(self):
 
 	# Set request headers
 	headers = {
-	    "X-Shopify-Access-Token": password,
-	    "Content-Type": "application/json"
+		"X-Shopify-Access-Token": password,
+		"Content-Type": "application/json"
 	}
 	response = requests.get(endpoint, headers=headers)
+	print(response)
 	orders = response.json()["orders"]
 	print("pppppppppppppppppppppppppppppppp",orders)
 	
@@ -229,11 +230,11 @@ def get_order(self):
 				response = requests.get(f'https://{shopify_url}/admin/api/2021-10/products/{idd}.json', headers={'X-Shopify-Access-Token': password})
 
 				if response.status_code == 200:
-				    product_data = response.json()['product']
-				    # Extract image URLs
-				    images_src += [image['src'] for image in product_data['images']]
+					product_data = response.json()['product']
+					# Extract image URLs
+					images_src += [image['src'] for image in product_data['images']]
 				else:
-				    print(f"Failed to fetch product details: {response.status_code} - {response.text}")
+					print(f"Failed to fetch product details: {response.status_code} - {response.text}")
 			print("Image src found ::::",images_src)
 			img_link  = images_src[0] if len(images_src)>0 else ''
 
@@ -245,7 +246,8 @@ def get_order(self):
 
 			contact_email = order_data.get('contact_email')
 			if raw_shipping_data:
-				customer_name = raw_shipping_data.get("first_name") + " " + raw_shipping_data.get("last_name")
+				customer_name = (raw_shipping_data.get("first_name") or "") + " " + (raw_shipping_data.get("last_name") or "")
+
 			else: 
 				customer_name = ""
 			print("::::::customer_name:::::::::::::",customer_name)
@@ -262,7 +264,6 @@ def get_order(self):
 			if disc_type == 'percentage':
 				if len(discount_info) > 0 :
 					for line_price in discount_info:
-						# print('====line_price.get()=',line_price.get('price'))
 						discount_per+= float(line_price.get('value'))
 				print('===============count====discount_percentage=======3333========',discount_per)
 			
@@ -272,30 +273,28 @@ def get_order(self):
 			if disc_type == 'fixed_amount':
 				if len(discount_codes) > 0 :
 					for line_price in discount_codes:
-						# print('====line_price.get()=',line_price.get('price'))
 						discount_amount+= float(line_price.get('amount'))
 				print('===============count====discount_amount===============',discount_amount)
 
 
 			tax_lines = order_data.get('tax_lines')
 
+			tax_lines_amount = 0
 			for tl in tax_lines: 
 				tax_lines_amount = tl.get('price')
 
 			shipping_lines_data = order_data.get('shipping_lines')
-			print ("\n shipping_lines ::::::555::::::::::", shipping_lines_data)
 		
 			shipping_lines = 0
 			if len(shipping_lines_data) > 0 :
 				for line_price in shipping_lines_data:
-					# print('====line_price.get()=',line_price.get('price'))
 					shipping_lines+= float(line_price.get('price'))
 
 			date_created = order_data.get('created_at').split("T")
 			date_created = date_created[0]
 
-			if customer_name == "":
-				print ("Not Customer Available::::::::::;")
+			if not customer_name:
+				frappe.throw(_(f"Not Customer Available in Shopify Order !! Please check the order id {order_id}"))
 			else:
 				link_customer_and_address( raw_shipping_data, customer_name, contact_email)
 				link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link)
@@ -338,13 +337,13 @@ def link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, 
 
 			#Upload image from image_src
 			if img_link:
-			    file_doc = frappe.get_doc({
-			        "doctype": "File",
-			        "file_url": img_link,
-			        "is_private": 0  # Set to 0 to make it accessible to all users
-			    })
-			    file_doc.insert()
-			    item.image = file_doc.file_url
+				file_doc = frappe.get_doc({
+					"doctype": "File",
+					"file_url": img_link,
+					"is_private": 0  # Set to 0 to make it accessible to all users
+				})
+				file_doc.insert()
+				item.image = file_doc.file_url
 			item.flags.ignore_mandatory = True
 			item.save()
 
@@ -380,7 +379,7 @@ def create_sales_order(order_id, shopify_connector_setting, customer_name, sys_l
 		new_sales_order.company = shopify_connector_setting.company
 		set_items_in_sales_order(new_sales_order, shopify_connector_setting, order_id, sys_lang,line_items,shipping_lines,final_delivery_date, tax_lines_amount, discount_amount, discount_per)
 		new_sales_order.flags.ignore_mandatory = True
-		new_sales_order.insert()
+		new_sales_order.insert(ignore_mandatory=True)
 		new_sales_order.submit()
 
 		frappe.db.commit()
@@ -441,3 +440,12 @@ def add_tax_details(sales_order, ordered_items_tax, desc, tax_account_head=None)
 	)
 
 
+
+@frappe.whitelist(allow_guest=True,methods=["POST"])
+def shopify_webhook():
+    data = frappe.request.get_data(as_text=True)
+    frappe.logger("shopify").info(f"Shopify Webhook Received: {data}")
+
+    return {"message": "Shopify request received"}, 200
+    
+    
