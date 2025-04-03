@@ -5,6 +5,7 @@ from frappe import _
 @frappe.whitelist(allow_guest=True)
 def receive_shopify_order():
     order_data = frappe.local.request.get_json()
+    print(order_data)
     settings = frappe.get_doc("Shopify Connector Setting")
     password = settings.access_token
     
@@ -47,6 +48,8 @@ def receive_shopify_order():
     sales_order.company = settings.company
     sales_order.naming_series = settings.sales_order_series or "SO-SPF-"
     sales_order.transaction_date = created_date
+    sales_order.additional_discount_percentage = discount_percentage or ""
+    sales_order.discount_amount = discount_fixed or ""
     sales_order.delivery_date = frappe.utils.add_days(created_date, settings.delivery_after_days or 7)
     
     images_src = []
@@ -95,8 +98,18 @@ def receive_shopify_order():
             "warehouse": settings.warehouse or f"Stores - {company_abbr}"
         })
     
+    if order_data.get("tax_lines"):
+        for tax in order_data.get("tax_lines", []):
+            sales_order.append("taxes", {
+                "charge_type": "Actual",
+                "account_head": "",
+                "rate": (tax.get("rate") or 0) * 100,
+                "tax_amount": tax.get("price")
+            })
+        
+    
     sales_order.flags.ignore_permissions = True
-    sales_order.insert(ignore_permissions=True)
+    sales_order.insert(ignore_mandatory=True)
     sales_order.submit()
     
     frappe.msgprint(_("Sales Order created for order number: {0}").format(order_number))
@@ -113,7 +126,6 @@ def link_customer_and_address( raw_shipping_data, customer_name, contact_email):
             old_name = customer.customer_name
 
         customer.customer_name = customer_name
-        customer.shopify_email = customer_shopify_email
         customer.shopify_email = customer_shopify_email
         customer.flags.ignore_permission = True
         customer.insert(ignore_permissions=True)
