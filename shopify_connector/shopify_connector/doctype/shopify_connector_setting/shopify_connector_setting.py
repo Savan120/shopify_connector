@@ -207,13 +207,9 @@ def get_order(self):
 		"Content-Type": "application/json"
 	}
 	response = requests.get(endpoint, headers=headers)
-	print(response)
 	orders = response.json()["orders"]
-	print("pppppppppppppppppppppppppppppppp",orders)
-	
 	if orders:
 		shopify_connector_setting = frappe.get_doc("Shopify Connector Setting")
-		print("::::::shopify_connector_setting:::::::::::::",shopify_connector_setting)
 		sys_lang = frappe.get_single("System Settings").language or "en"
 		for order_data in orders:
 			order_id = order_data.get('order_number')
@@ -235,7 +231,6 @@ def get_order(self):
 					images_src += [image['src'] for image in product_data['images']]
 				else:
 					print(f"Failed to fetch product details: {response.status_code} - {response.text}")
-			print("Image src found ::::",images_src)
 			img_link  = images_src[0] if len(images_src)>0 else ''
 
 			billing = order_data.get('billing_address')
@@ -250,10 +245,8 @@ def get_order(self):
 
 			else: 
 				customer_name = ""
-			print("::::::customer_name:::::::::::::",customer_name)
 
 			discount_info = order_data.get('discount_applications')
-			print("::::::discount_info::::1:::::::::",discount_info)
 			disc_type = ''
 			for dis_value in discount_info:
 				disc_type = dis_value.get('value_type')
@@ -265,7 +258,6 @@ def get_order(self):
 				if len(discount_info) > 0 :
 					for line_price in discount_info:
 						discount_per+= float(line_price.get('value'))
-				print('===============count====discount_percentage=======3333========',discount_per)
 			
 
 			discount_codes = order_data.get('discount_codes')
@@ -274,7 +266,6 @@ def get_order(self):
 				if len(discount_codes) > 0 :
 					for line_price in discount_codes:
 						discount_amount+= float(line_price.get('amount'))
-				print('===============count====discount_amount===============',discount_amount)
 
 
 			tax_lines = order_data.get('tax_lines')
@@ -357,7 +348,6 @@ def get_series():
 def create_sales_order(order_id, shopify_connector_setting, customer_name, sys_lang, line_items, shipping_lines, tax_lines_amount, discount_amount, discount_per, date_created=None):
 	already_synched_ids = frappe.db.get_list('Sales Order', filters=[('shopify_id', '=', order_id)], fields=['name'], as_list=True, ignore_permissions=True)
 
-	print ("\n already_synched_ids ::::::::::::::", already_synched_ids)
 	if not already_synched_ids:
 		new_sales_order = frappe.new_doc("Sales Order")
 		new_sales_order.customer = customer_name
@@ -366,7 +356,6 @@ def create_sales_order(order_id, shopify_connector_setting, customer_name, sys_l
 		new_sales_order.naming_series = shopify_connector_setting.sales_order_series or "SO-SPF-"
 		
 
-		print("::::date_created::::::",date_created)
 		created_date = date_created
 		new_sales_order.transaction_date = created_date
 		delivery_after = shopify_connector_setting.delivery_after_days or 7
@@ -394,11 +383,9 @@ def set_items_in_sales_order(new_sales_order, shopify_connector_setting, order_i
 	# total_amount = 0.0
 	for item in line_items:
 		shopify_item_id = item.get("product_id")
-		print("::::::::::::::shopify_item_id::::::::::::::::::::",shopify_item_id)
 		found_item = frappe.get_doc("Item", {"shopify_id": cstr(shopify_item_id)})		
 	
 		ordered_items_tax = tax_lines_amount
-		print(":::::::::::::::::::ordered_items_tax:::::::::::::::::", ordered_items_tax)
 
 
 		new_sales_order.append(
