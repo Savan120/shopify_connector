@@ -5,7 +5,6 @@ from frappe import _
 @frappe.whitelist(allow_guest=True)
 def receive_shopify_order():
     order_data = frappe.local.request.get_json()
-    print(order_data)
     settings = frappe.get_doc("Shopify Connector Setting")
     password = settings.access_token
     
