@@ -54,10 +54,12 @@ def receive_shopify_order():
     images_src = []
     for item in items:
         product_id = item.get("product_id")
+        print("\n\n>>>>>>>>>>>\n\n",product_id)
         item_name = item.get("name")
+        exist_item = frappe.db.get_value("Item", {"shopify_id": product_id})
+        print("\n\n\!!!!!!!!!!!!!n\n",exist_item)
             
-            
-        if not frappe.db.get_value("Item", {"shopify_id": product_id}):
+        if not exist_item:
             new_item = frappe.new_doc("Item")
             new_item.item_code = f"Shopify-{product_id}"
             new_item.item_name = item_name
@@ -65,6 +67,9 @@ def receive_shopify_order():
             new_item.item_group = _( "Shopify Products", sys_lang)
             new_item.shopify_id = product_id
             new_item.shopify_selling_rate = item.get("price", 0)
+            new_item.flags.ignore_permissions = 1
+            new_item.insert(ignore_permissions=True)
+            new_item.save()
             
             response = requests.get(f'https://{shopify_url}/admin/api/2021-10/products/{product_id}.json', headers={'X-Shopify-Access-Token': password})
             if response.status_code == 200:
@@ -73,19 +78,19 @@ def receive_shopify_order():
             else:
                 print(f"Failed to fetch product details: {response.status_code} - {response.text}")
             img_link  = images_src[0] if len(images_src)>0 else ''
-            
-            file_doc = frappe.new_doc("File")
-            file_doc.file_url = img_link
-            file_doc.is_private = 0
-            file_doc.flags.ignore_permissions = True
-            file_doc.insert(ignore_permissions=True)
-            file_doc.save()
-            new_item.image = file_doc.file_url if file_doc else '' 
+            if img_link:
+                file_doc = frappe.new_doc("File")
+                file_doc.file_url = img_link
+                file_doc.is_private = 0
+                file_doc.flags.ignore_permissions = True
+                file_doc.insert(ignore_permissions=True)
+                file_doc.save()
+                new_item.image = file_doc.file_url if file_doc else '' 
                 
-            new_item.flags.ignore_permissions = 1
-            new_item.insert(ignore_permissions=True)
-            new_item.save()
-        
+                new_item.flags.ignore_permissions = 1
+                new_item.insert(ignore_permissions=True)
+                new_item.save()
+            
         sales_order.append("items", {
             "item_code": f"Shopify-{product_id}",
             "item_name": item_name,
@@ -205,14 +210,14 @@ def product_creation():
     else:
         print(f"Failed to fetch product details: {response.status_code} - {response.text}")
     img_link  = images_src[0] if len(images_src)>0 else ''
-    
-    file_doc = frappe.new_doc("File")
-    file_doc.file_url = img_link
-    file_doc.is_private = 0
-    file_doc.flags.ignore_permissions = True
-    file_doc.insert(ignore_permissions=True)
-    file_doc.save()
-    item.image = file_doc.file_url if file_doc else '' 
+    if img_link:
+        file_doc = frappe.new_doc("File")
+        file_doc.file_url = img_link
+        file_doc.is_private = 0
+        file_doc.flags.ignore_permissions = True
+        file_doc.insert(ignore_permissions=True)
+        file_doc.save()
+        item.image = file_doc.file_url if file_doc else '' 
                 
     item.flags.ignore_permission = True
     item.insert(ignore_permissions=True)
