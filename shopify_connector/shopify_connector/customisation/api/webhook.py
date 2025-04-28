@@ -1,8 +1,8 @@
 import frappe
 import requests
 from frappe import _
-
-
+import random
+import string
 @frappe.whitelist(allow_guest=True)
 def receive_shopify_order():
     order_data = frappe.local.request.get_json()
@@ -54,7 +54,8 @@ def receive_shopify_order():
         link_customer_and_address(raw_shipping_data, customer_name, contact_email)
     
     exists_item = frappe.db.exists("Item", {"name": "Shipping Charge"})
-    
+    print("\n\n\n get_customer ",get_customer)
+    print("\n\n\n get_customer ",exists_item)
     if not exists_item:
         ship_item = frappe.new_doc("Item")
         ship_item.item_code = "Shipping Charge"
@@ -62,7 +63,7 @@ def receive_shopify_order():
         ship_item.item_group = "Shopify Products"
         ship_item.is_stock_item = 0
         
-        ship_item.flags.ignore_permissions = 1
+        ship_item.flags.ignore_mandatory = True
         ship_item.insert(ignore_permissions=True)
 
     sales_order = frappe.new_doc("Sales Order")
@@ -91,7 +92,7 @@ def receive_shopify_order():
             new_item.item_group = _("Shopify Products", sys_lang)
             new_item.shopify_id = product_id
             new_item.shopify_selling_rate = item.get("price", 0)
-            new_item.flags.ignore_permissions = 1
+            new_item.flags.ignore_mandatory = True
             new_item.insert(ignore_permissions=True)
             new_item.save()
 
@@ -110,13 +111,13 @@ def receive_shopify_order():
                     file_doc = frappe.new_doc("File")
                     file_doc.file_url = img_link
                     file_doc.is_private = 0
-                    file_doc.flags.ignore_permissions = True
-                    file_doc.insert(ignore_permissions=True)
+                    file_doc.flags.ignore_mandatory = True
+                    file_doc.insert()
                     file_doc.save()
 
                     new_item.image = file_doc.file_url
 
-                    new_item.flags.ignore_permissions = 1
+                    new_item.flags.ignore_permissions = True
                     new_item.save()
             else:
                 print(f"Failed to fetch product details: {response.status_code} - {response.text}")
@@ -145,7 +146,7 @@ def receive_shopify_order():
                     "tax_amount": tax.get("price"),
                 },
             )
-
+    sales_order.flags.ignore_mandatory = True
     sales_order.flags.ignore_permissions = True
     sales_order.insert()
     sales_order.save()
@@ -373,11 +374,160 @@ def customer_update():
         )
 
 
+	
+# @frappe.whitelist(allow_guest=True)
+# def order_update():
+#     order_data = frappe.local.request.get_json()
+#     print(order_data)
+#     cus = frappe.get_doc("Customer", {"shopify_email": order_data.get("email")})
+#     settings = frappe.get_doc("Shopify Connector Setting")
+#     password = settings.access_token
+#     shopify_url = settings.shop_url
+
+#     company_abbr = frappe.db.get_value("Company", settings.company, "abbr")
+#     sys_lang = frappe.get_single("System Settings").language or "en"
+
+#     order_number = order_data.get("order_number")
+#     customer = order_data.get("customer", {})
+#     customer_name = customer.get("first_name", "") + " " + customer.get("last_name", "")
+#     contact_email = customer.get("email")
+#     created_date = order_data.get("created_at", "").split("T")[0]
+#     items = order_data.get("line_items", [])
+#     discount_info = order_data.get("discount_applications", [])
+
+#     discount_percentage = sum(
+#         float(dis.get("value", 0))
+#         for dis in discount_info
+#         if dis.get("value_type") == "percentage"
+#     )
+#     discount_fixed = sum(
+#         float(dis.get("value", 0))
+#         for dis in discount_info
+#         if dis.get("value_type") == "fixed_amount"
+#     )
+
+#     sales_id = frappe.db.get_value("Sales Order", {"shopify_id": order_number})
+
+#     if not sales_id:
+#         frappe.throw(
+#             _("Sales Order not found for Shopify Order: {0}").format(order_number)
+#         )
+
+#     sales_order = frappe.get_doc("Sales Order", sales_id)
+#     sales_order.customer = customer_name.strip() or "Guest"
+#     sales_order.shopify_id = order_number
+#     sales_order.company = settings.company
+#     sales_order.naming_series = settings.sales_order_series or "SO-SPF-"
+#     sales_order.transaction_date = created_date
+#     sales_order.delivery_date = frappe.utils.add_days(
+#         created_date, settings.delivery_after_days or 7
+#     )
+#     sales_order.additional_discount_percentage = discount_percentage or 0
+#     sales_order.discount_amount = discount_fixed or 0
+    
+
+#     if order_data.get("shipping_address") or order_data.get("billing_address"):
+#         address = order_data.get("shipping_address")
+#         cus_address = frappe.get_doc("Address", {"name": sales_order.customer_address})
+#         cus_address.db_set(
+#             "address_title",
+#             address.get("first_name", "") + " " + address.get("last_name", ""),
+#         )
+#         cus_address.address_type =  "Shipping"
+#         cus_address.address_line1 =  address.get("address1")
+#         cus_address.address_line2 = address.get("address2")
+#         cus_address.city = address.get("city")
+#         cus_address.state = address.get("province")
+#         cus_address.country = address.get("country")
+#         cus_address.pincode = address.get("zip")
+#         cus_address.phone = address.get("phone")
+        
+#         cus_address.flags.ignore_permissions = True
+#         cus_address.save()
+
+#     sales_order.set("items", [])
+
+#     for item in items:
+#         product_id = item.get("product_id")
+#         print(product_id)
+#         item_name = item.get("name")
+#         quantity = item.get("quantity")
+#         price = item.get("price")
+#         item_code = f"Shopify-{product_id}"
+
+#         exist_item = frappe.db.get_value("Item", {"name": item_code})
+#         # print("existitem is",exist_item )
+#         if not product_id:
+#             prefix = "PROD"
+#             length = 8
+#             random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+#             product_id = f"{prefix}-{random_part}"
+#             new_item = frappe.new_doc("Item")
+#             new_item.item_code = f"Shopify-{product_id or a }"
+#             new_item.item_name = item_name
+#             new_item.stock_uom = settings.uom or _("Nos", sys_lang)
+#             new_item.item_group = _("Shopify Products", sys_lang)
+#             new_item.shopify_id = product_id
+#             new_item.shopify_selling_rate = item.get("price", 0)
+#             new_item.flags.ignore_mandatory = True
+#             new_item.insert(ignore_permissions=True)
+#             new_item.save()
+#             exist_item = new_item.name
+#             # print("\n\n\n  exist item",exist_item)
+#             # new_item = frappe.new_doc("Item")
+#             # new_item.item_code = item_code
+#             # new_item.item_name = item_name
+#             # new_item.rate = price
+#             # new_item.qty = quantity
+#             # new_item.stock_uom = settings.uom or _("Nos", sys_lang)
+#             # new_item.item_group = _("Shopify Products", sys_lang)
+#             # new_item.flags.ignore_mandatory = True
+#             # new_item.flags.ignore_permissions = True
+#             # new_item.insert()
+#             # exist_item = new_item.name
+
+#         sales_order.append(
+#             "items",
+#             {
+#                 "item_code": exist_item,
+#                 "item_name": item_name,
+#                 "qty": quantity,
+#                 "rate": price,
+#                 "uom": settings.uom or _("Nos", sys_lang),
+#                 "delivery_date": sales_order.delivery_date,
+#                 "warehouse": settings.warehouse or f"Stores - {company_abbr}",
+#             },
+#         )
+
+#     sales_order.set("taxes", [])
+#     tax_account = settings.tax_account or f"Sales Tax - {company_abbr}"
+#     for tax in order_data.get("tax_lines", []):
+#         sales_order.append(
+#             "taxes",
+#             {
+#                 "charge_type": "Actual",
+#                 "account_head": tax_account,
+#                 "description": tax.get("title") or "Shopify Tax",
+#                 "rate": (tax.get("rate") or 0) * 100,
+#                 "tax_amount": float(tax.get("price", 0)),
+#             },
+#         )
+
+#     sales_order.flags.ignore_permissions = True
+#     sales_order.save()
+
+#     frappe.msgprint(_("Sales Order updated for order number: {0}").format(order_number))
+#     return "Success"
+
+
 @frappe.whitelist(allow_guest=True)
 def order_update():
     order_data = frappe.local.request.get_json()
     print(order_data)
-    cus = frappe.get_doc("Customer", {"shopify_email": order_data.get("email")})
+
+    customer_email = order_data.get("email")
+    customer_name = frappe.db.get_value("Customer", {"shopify_email": customer_email}, "name")
+
     settings = frappe.get_doc("Shopify Connector Setting")
     password = settings.access_token
     shopify_url = settings.shop_url
@@ -387,8 +537,7 @@ def order_update():
 
     order_number = order_data.get("order_number")
     customer = order_data.get("customer", {})
-    customer_name = customer.get("first_name", "") + " " + customer.get("last_name", "")
-    contact_email = customer.get("email")
+    customer_full_name = (customer.get("first_name", "") + " " + customer.get("last_name", "")).strip() or "Guest"
     created_date = order_data.get("created_at", "").split("T")[0]
     items = order_data.get("line_items", [])
     discount_info = order_data.get("discount_applications", [])
@@ -407,65 +556,57 @@ def order_update():
     sales_id = frappe.db.get_value("Sales Order", {"shopify_id": order_number})
 
     if not sales_id:
-        frappe.throw(
-            _("Sales Order not found for Shopify Order: {0}").format(order_number)
-        )
+        frappe.throw(_("Sales Order not found for Shopify Order: {0}").format(order_number))
 
     sales_order = frappe.get_doc("Sales Order", sales_id)
-    sales_order.customer = customer_name.strip() or "Guest"
+    sales_order.customer = customer_full_name
     sales_order.shopify_id = order_number
     sales_order.company = settings.company
     sales_order.naming_series = settings.sales_order_series or "SO-SPF-"
     sales_order.transaction_date = created_date
-    sales_order.delivery_date = frappe.utils.add_days(
-        created_date, settings.delivery_after_days or 7
-    )
+    sales_order.delivery_date = frappe.utils.add_days(created_date, settings.delivery_after_days or 7)
     sales_order.additional_discount_percentage = discount_percentage or 0
     sales_order.discount_amount = discount_fixed or 0
-    
 
-    if order_data.get("shipping_address") or order_data.get("billing_address"):
-        address = order_data.get("shipping_address")
-        cus_address = frappe.get_doc("Address", {"name": sales_order.customer_address})
-        cus_address.db_set(
-            "address_title",
-            address.get("first_name", "") + " " + address.get("last_name", ""),
-        )
-        cus_address.address_type =  "Shipping"
-        cus_address.address_line1 =  address.get("address1")
+    address = order_data.get("shipping_address") or order_data.get("billing_address")
+    if address and sales_order.customer_address:
+        cus_address = frappe.get_doc("Address", sales_order.customer_address)
+        cus_address.db_set("address_title", (address.get("first_name", "") + " " + address.get("last_name", "")).strip())
+        cus_address.address_type = "Shipping"
+        cus_address.address_line1 = address.get("address1")
         cus_address.address_line2 = address.get("address2")
         cus_address.city = address.get("city")
         cus_address.state = address.get("province")
         cus_address.country = address.get("country")
         cus_address.pincode = address.get("zip")
         cus_address.phone = address.get("phone")
-        
         cus_address.flags.ignore_permissions = True
         cus_address.save()
 
     sales_order.set("items", [])
 
     for item in items:
-        product_id = item.get("product_id")
+        # product_id = item.get("product_id")
+        product_id = item.get("product_id") or item.get('id')
         item_name = item.get("name")
         quantity = item.get("quantity")
         price = item.get("price")
         item_code = f"Shopify-{product_id}"
-
-        exist_item = frappe.db.get_value("Item", {"name": item_code})
+    
+        exist_item = frappe.db.get_value("Item", {"name": item_code},"name")
 
         if not exist_item:
             new_item = frappe.new_doc("Item")
-            new_item.item_code = item_code
+            new_item.item_code = f"Shopify-{product_id or a }"
             new_item.item_name = item_name
-            new_item.rate = price
-            new_item.qty = quantity
             new_item.stock_uom = settings.uom or _("Nos", sys_lang)
             new_item.item_group = _("Shopify Products", sys_lang)
+            new_item.shopify_id = product_id
+            new_item.shopify_selling_rate = item.get("price", 0)
             new_item.flags.ignore_mandatory = True
-            new_item.flags.ignore_permissions = True
-            new_item.insert()
-            # exist_item = new_item.name
+            new_item.insert(ignore_permissions=True)
+            new_item.save()
+            exist_item = new_item.name
 
         sales_order.append(
             "items",
@@ -497,5 +638,8 @@ def order_update():
     sales_order.flags.ignore_permissions = True
     sales_order.save()
 
-    frappe.msgprint(_("Sales Order updated for order number: {0}").format(order_number))
-    return "Success"
+    return {
+        "status": "success",
+        "message": f"Sales Order updated for Shopify Order: {order_number}",
+        "sales_order": sales_order.name
+    }
