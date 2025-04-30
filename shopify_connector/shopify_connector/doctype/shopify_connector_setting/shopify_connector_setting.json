@@ -20,7 +20,13 @@
   "delivery_after_days",
   "warehouse",
   "tax_account",
-  "f_n_f_account"
+  "f_n_f_account",
+  "erpnext_to_shopify_section",
+  "sync_customer",
+  "sync_product",
+  "column_break_tqvw",
+  "sync_orders",
+  "sync_invoices"
  ],
  "fields": [
   {
@@ -105,12 +111,45 @@
    "label": "Freight and Forwarding Account",
    "mandatory_depends_on": "eval:doc.enable_shopify",
    "options": "Account"
+  },
+  {
+   "fieldname": "erpnext_to_shopify_section",
+   "fieldtype": "Section Break",
+   "label": "ERPNext To Shopify"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_customer",
+   "fieldtype": "Check",
+   "label": "Sync Customer"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_product",
+   "fieldtype": "Check",
+   "label": "Sync Product"
+  },
+  {
+   "fieldname": "column_break_tqvw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_orders",
+   "fieldtype": "Check",
+   "label": "Sync Orders"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_invoices",
+   "fieldtype": "Check",
+   "label": "Sync Invoices"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-03-11 14:41:21.497688",
+ "modified": "2025-04-30 15:01:30.564803",
  "modified_by": "Administrator",
  "module": "Shopify Connector",
  "name": "Shopify Connector Setting",
@@ -128,6 +167,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

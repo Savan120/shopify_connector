@@ -122,13 +122,13 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-#	"*": {
-#		"on_update": "method",
-#		"on_cancel": "method",
-#		"on_trash": "method"
-#	}
-# }
+doc_events = {
+    "Customer": {
+        "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
+        "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
+    }
+}
+
 
 # Scheduled Tasks
 # ---------------

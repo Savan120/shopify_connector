@@ -206,7 +206,7 @@ def get_order(self):
 		"X-Shopify-Access-Token": password,
 		"Content-Type": "application/json"
 	}
-	response = requests.get(endpoint, headers=headers)
+	response = requests.get(endpoint, headers=headers, verify=False)
 	orders = response.json()["orders"]
 	if orders:
 		shopify_connector_setting = frappe.get_doc("Shopify Connector Setting")
@@ -223,7 +223,7 @@ def get_order(self):
 			images_src = []
 			for image_item in line_items:
 				idd = image_item.get('product_id')
-				response = requests.get(f'https://{shopify_url}/admin/api/2021-10/products/{idd}.json', headers={'X-Shopify-Access-Token': password})
+				response = requests.get(f'https://{shopify_url}/admin/api/2021-10/products/{idd}.json', headers={'X-Shopify-Access-Token': password},verify=False)
 
 				if response.status_code == 200:
 					product_data = response.json()['product']
@@ -299,10 +299,8 @@ def link_customer_and_address( raw_shipping_data, customer_name, contact_email):
 		customer_shopify_email = contact_email
 		customer_exists = frappe.get_value("Customer", {"shopify_email": customer_shopify_email})
 		if not customer_exists:
-			# Create Customer
 			customer = frappe.new_doc("Customer")
 		else:
-			# Edit Customer
 			customer = frappe.get_doc("Customer", {"shopify_email": customer_shopify_email})
 			old_name = customer.customer_name
 

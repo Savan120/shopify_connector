@@ -493,3 +493,76 @@ def order_update():
         "message": f"Sales Order updated for Shopify Order: {order_number}",
         "sales_order": sales_order.name
     }
+
+# import requests
+# import frappe
+
+# SHOPIFY_API_KEY = "5b937496a545561abb8ddf5ae95a4f58"
+# SHOPIFY_PASSWORD = "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"
+# SHOPIFY_STORE_URL = "mysolufy.myshopify.com"
+# SHOPIFY_API_VERSION = "2024-01"
+
+# @frappe.whitelist()
+# def send_item_to_shopify(item_code):
+#     item = frappe.get_doc("Item", item_code)
+
+#     # Prepare product payload
+#     product_payload = {
+#         "product": {
+#             "title": item.item_name,
+#             "body_html": f"<strong>{item.description or ''}</strong>",
+#             "vendor": item.brand or "Default Vendor",
+#             "product_type": item.item_group,
+#             "variants": []
+#         }
+#     }
+
+#     # Handle variants if the item has variants
+#     if item.has_variants:
+#         for variant in frappe.get_all("Item Variant", filters={"parent": item_code}, fields=["variant_of", "item_code", "stock_uom", "standard_rate", "opening_stock"]):
+#             variant_item = frappe.get_doc("Item Variant", variant["item_code"])
+
+#             variant_payload = {
+#                 "price": variant_item.standard_rate or "0.00",
+#                 "sku": variant_item.item_code,
+#                 "inventory_management": "shopify",
+#                 "inventory_quantity": int(variant_item.opening_stock or 0),
+#                 "requires_shipping": True,
+#                 "taxable": True,
+#                 "option1": variant_item.variant_of,  # Option (like size, color, etc.)
+#                 "option2": variant_item.stock_uom  # This is just an example; modify based on your UOM or variant type
+#             }
+
+#             # Add variant to the variants list
+#             product_payload["product"]["variants"].append(variant_payload)
+#     else:
+#         # If no variants, just use the main item as the variant
+#         product_payload["product"]["variants"].append({
+#             "price": item.standard_rate or "0.00",
+#             "sku": item.item_code,
+#             "inventory_management": "shopify",
+#             "inventory_quantity": int(item.opening_stock or 0),
+#             "requires_shipping": True,
+#             "taxable": True
+#         })
+
+#     # URL to Shopify API
+#     url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_PASSWORD}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
+    
+#     # Send the request to Shopify
+#     response = requests.post(url, json=product_payload, verify=False)
+#     print(response.json(), "\n\n")
+
+#     if response.status_code != 201:
+#         frappe.log_error(f"Shopify product sync failed: {response.text}", "Shopify Item Sync Error")
+#     else:
+#         shopify_product_id = response.json()["product"]["id"]
+#         frappe.db.set_value("Item", item_code, "shopify_product_id", shopify_product_id)
+
+#         # Update each variant with its Shopify ID
+#         if item.has_variants:
+#             for variant in frappe.get_all("Item Variant", filters={"parent": item_code}, fields=["item_code"]):
+#                 variant_item = frappe.get_doc("Item Variant", variant["item_code"])
+#                 shopify_variant_id = response.json()["product"]["variants"][0]["id"]  # Adjust accordingly for multiple variants
+#                 frappe.db.set_value("Item Variant", variant_item.item_code, "shopify_variant_id", shopify_variant_id)
+
