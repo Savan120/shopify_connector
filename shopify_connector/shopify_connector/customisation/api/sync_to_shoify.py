@@ -202,8 +202,6 @@ def send_customer_to_shopify_hook(doc, method):
         address_list = []
 
         if address_links:
-            print("///////////////")
-
             primary_address = frappe.get_doc("Address", address_links[0]["parent"])
             email = primary_address.email_id or ""
             phone = primary_address.phone or ""
@@ -221,7 +219,6 @@ def send_customer_to_shopify_hook(doc, method):
                     "email": address.email_id
                 })
         elif doc.get("customer_primary_address"):
-            print("###############")
             primary_address = frappe.get_doc("Address", doc.customer_primary_address)
             email = primary_address.email_id or ""
             phone = primary_address.phone or ""
@@ -229,7 +226,7 @@ def send_customer_to_shopify_hook(doc, method):
                 "address1": primary_address.address_line1,
                 "address2": primary_address.address_line2 or "",
                 "city": primary_address.city,
-                "province": primary_address.state,
+                "province": primary_address.state or primary_address.custom_state,
                 "country": primary_address.country,
                 "zip": primary_address.pincode,
                 "phone": primary_address.phone,
@@ -238,8 +235,6 @@ def send_customer_to_shopify_hook(doc, method):
             print(address_list)
 
 
-
-        # Build payload
         customer_payload = {
             "customer": {
                 "first_name": doc.customer_name or "",
@@ -270,9 +265,6 @@ def send_customer_to_shopify_hook(doc, method):
                 shopify_id = response.json()["customer"]["id"]
                 shopify_email = response.json()["customer"]["email"]
                 doc.flags.from_shopify = True
-                # frappe.db.set_value("Customer", doc.name, "shopify_id", shopify_id)
-                # frappe.db.commit()
-                # frappe.db.set_value("Customer", doc.name, "shopify_email", shopify_email)
                 doc.db_set("shopify_id",shopify_id)
                 # doc.db_set("shopify_email",shopify_email)
 
@@ -291,8 +283,6 @@ def delete_customer_from_shopify(doc, method):
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
     SHOPIFY_API_VERSION = "2024-01"
-    # print()
-
     url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{doc.shopify_id}.json"
 
     response = requests.delete(url, verify=False)

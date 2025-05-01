@@ -178,9 +178,13 @@ def link_customer_and_address(raw_shipping_data, customer_name, contact_email):
 
 @frappe.whitelist(allow_guest=True)
 def customer_creation():
+    def send_customer_to_shopify_hook(doc, method):
+        if getattr(doc.flags, "from_shopify", False):
+            return
     order_data = frappe.local.request.get_json()
     if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
         cus = frappe.new_doc("Customer")
+        cus.flags.from_shopify = True
         cus.shopify_email = order_data.get("email")
         cus.customer_name = (
             order_data.get("first_name", "") + " " + order_data.get("last_name", "")
@@ -246,8 +250,11 @@ def customer_creation():
             cus_contact.flags.ignore_permissions = True
             cus_contact.insert(ignore_mandatory=True)
             cus_contact.save()
+            cus.flags.from_shopify = True
 
         cus.save()
+        
+        
         frappe.msgprint( 
             _("Customer created for email: {0}").format(order_data.get("email"))
         )
@@ -361,7 +368,7 @@ def customer_update():
             cus_address.db_set("pincode", address.get("zip"))
             cus_address.db_set("phone", address.get("phone"))
             cus.flags.ignore_mandatory = True
-       
+    
         frappe.msgprint(
             _("Customer created for email: {0}").format(order_data.get("email"))
         )
