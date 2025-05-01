@@ -64,7 +64,7 @@ def send_customer_to_shopify_hook(doc, method):
                 "phone": primary_address.phone,
                 "email": primary_address.email_id
             })
-            print(address_list)
+            
 
 
         customer_payload = {
@@ -81,15 +81,12 @@ def send_customer_to_shopify_hook(doc, method):
 
             if shopify_customer_id:
                 customer_payload["customer"]["id"] = shopify_customer_id
-                print(customer_payload)
                 url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}.json"
                 response = requests.put(url, json=customer_payload, verify=False)
-                print(response.text)
-                print("Updating customer:", url)
             else:
                 url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers.json"
                 response = requests.post(url, json=customer_payload, verify=False)
-                print("Creating new customer:", url)
+        
 
             if response.status_code not in (200, 201):
                 frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
@@ -124,13 +121,12 @@ def delete_customer_from_shopify(doc, method):
 
 
 
+
 def get_current_domain_name() -> str:
-    """Get current site domain name."""
     if frappe.conf.developer_mode and frappe.conf.localtunnel_url:
         return frappe.conf.localtunnel_url
     else:
         return frappe.request.host
-
 
 def send_item_to_shopify(doc, method):
     if getattr(doc.flags, "from_shopify", False):
@@ -147,13 +143,11 @@ def send_item_to_shopify(doc, method):
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
     SHOPIFY_API_VERSION = "2024-01"
-
     image_url = ""
     if item.image:
-        try:
-            image_url = site_url + item.image
-        except Exception as e:
-            frappe.log_error(f"Image URL error: {str(e)}", "Shopify Sync")
+        if not site_url.startswith("http"):
+            site_url = "https://" + site_url
+        image_url = site_url + item.image
 
     product_payload = {
         "product": {
@@ -163,62 +157,17 @@ def send_item_to_shopify(doc, method):
             "product_type": item.item_group or "",
             "variants": [],
             "images": [],
-            "options": [],
         }
     }
-
+    product_payload["product"]["variants"].append({"price": item.shopify_selling_rate or 0.0})
     if image_url:
         product_payload["product"]["images"].append({"src": image_url})
-
-    if item.has_variants:
-        product_payload["product"]["options"].append({"name": "Color"})
-
-        variants = frappe.get_all(
-            "Item",
-            filters={"variant_of": item.name},
-            fields=["name", "item_code"]
-        )
-
-        for idx, variant in enumerate(variants, start=1):
-            variant_doc = frappe.get_doc("Item", variant["item_code"])
-
-            variant_price = str(variant_doc.get("shopify_selling_rate") or variant_doc.get("standard_rate") or "1.00")
-            variant_image_url = ""
-            if variant_doc.image:
-                try:
-                    variant_image_url = site_url + variant_doc.image
-                    product_payload["product"]["images"].append({
-                        "src": variant_image_url,
-                        "position": idx
-                    })
-                except Exception as e:
-                    frappe.log_error(f"Variant image error: {str(e)}", "Shopify Sync")
-
-            product_payload["product"]["variants"].append({
-                "option1": variant_doc.get("variant_attribute", "Color"),
-                "price": variant_price,
-                "sku": variant_doc.get("item_code"),
-                "inventory_management": "shopify",
-                "inventory_quantity": int(variant_doc.get("opening_stock") or 0),
-                "requires_shipping": True,
-                "taxable": True,
-            })
-
-    else:
-        item_price = str(item.get("shopify_selling_rate") or item.get("standard_rate") or "1.00")
-
-        product_payload["product"]["variants"].append({
-            "price": item_price,
-            "sku": item.item_code,
-            "inventory_management": "shopify",
-            "inventory_quantity": int(item.opening_stock or 0),
-            "requires_shipping": True,
-            "taxable": True
-        })
+        
 
     if item.shopify_id:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{item.shopify_id}.json"
         response = requests.put(url, json=product_payload, verify=False)
+        
     else:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
