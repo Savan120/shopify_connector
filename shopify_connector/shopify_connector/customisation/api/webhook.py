@@ -267,6 +267,7 @@ def customer_creation():
 @frappe.whitelist(allow_guest=True)
 def product_creation():
     order_data = frappe.local.request.get_json()
+    print(order_data)
     product_id = order_data.get("id")
     sys_lang = frappe.get_single("System Settings").language or "en"
     status = False
@@ -296,6 +297,7 @@ def product_creation():
     )
     if response.status_code == 200:
         product_data = response.json()["product"]
+        print("product_data",product_data)
         product_images = product_data.get("images", [])
         img_link = product_images[0]["src"] if product_images else ""
 
