@@ -28,7 +28,7 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Address" : "shopify_connector/customisation/address/address.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -126,6 +126,7 @@ doc_events = {
     "Customer": {
         "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
+        "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_customer_from_shopify",
     }
 }
 
