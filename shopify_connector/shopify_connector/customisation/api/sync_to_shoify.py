@@ -380,8 +380,10 @@ def send_item_to_shopify(doc, method):
 
     if item.variant_of:
         variants_of = frappe.get_value("Item", doc.name, "variant_of")
+        print(variants_of)
         variant_parent_shopify_id = frappe.get_value("Item", variants_of, "shopify_id")
         parent_doc = frappe.get_doc("Item", {"shopify_id": variant_parent_shopify_id})
+        print(parent_doc)
         
         product_payload = {
             "product": {
@@ -435,6 +437,11 @@ def send_item_to_shopify(doc, method):
                     product_payload["product"]["images"].append({
                         "src": site_url + variant_doc.image
                     })
+
+
+
+
+
 
             for attr_name, values in option_map.items():
                 product_payload["product"]["options"].append({
@@ -529,7 +536,7 @@ def send_item_to_shopify(doc, method):
         response = requests.put(url, json=product_payload, verify=False)
         print("elif")
 
-        shopify_product = response.json()["product"]
+        shopify_product = response.json()
 
         for variant in shopify_product.get("variants", []):
             sku = variant.get("sku")
