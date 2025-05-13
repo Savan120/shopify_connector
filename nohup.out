@@ -1,0 +1,146 @@
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5421
+ * Running on http://10.42.0.142:5421
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+10.42.0.142 - - [13/May/2025 12:43:24] "GET / HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /assets/frappe/dist/css/website.bundle.VH43F462.css HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /assets/erpnext/dist/css/erpnext-web.bundle.XFXUPCLR.css HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /assets/frappe/dist/js/frappe-web.bundle.UI6UTECM.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /assets/erpnext/dist/js/erpnext-web.bundle.253I7LT4.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /assets/frappe/css/fonts/inter/InterVariable.woff2 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /website_script.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /assets/erpnext/images/erpnext-favicon.svg HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:24] "GET /assets/frappe/dist/js/file_uploader.bundle.E4WDUGA3.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /app HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/css/desk.bundle.RJYVW2PZ.css HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/css/report.bundle.4TPZ75A3.css HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/erpnext/dist/css/erpnext.bundle.7QWY4YRJ.css HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/libs.bundle.LLRFRX7M.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/desk.bundle.X6XDH6G5.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/list.bundle.THZNRRJT.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/form.bundle.AIU3IK7S.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/controls.bundle.EQ2VRC7H.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/report.bundle.BDYDEGPQ.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/telemetry.bundle.ZJBT5ETW.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/billing.bundle.VHWCFGXO.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/erpnext/dist/js/erpnext.bundle.OBUQ2ISG.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/builder/js/builder.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/icons/timeless/icons.svg?v=1747054884.631121 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/icons/espresso/icons.svg?v=1747054884.631121 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/erpnext/images/erpnext-logo.svg HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "[33mGET /assets/servisa/js/servisa.js HTTP/1.1[0m" 404 -
+10.42.0.142 - - [13/May/2025 12:43:28] "POST /api/method/erpnext.accounts.utils.get_fiscal_year HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "POST /api/method/erpnext.accounts.utils.get_fiscal_year HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "POST /api/method/erpnext.accounts.utils.get_fiscal_year HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "POST /api/method/erpnext.accounts.utils.get_fiscal_year HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "[33mGET /assets/servisa/js/servisa.js HTTP/1.1[0m" 404 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/sounds/email.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/sounds/cancel.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/sounds/submit.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/sounds/click.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/sounds/delete.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/sounds/error.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/erpnext/sounds/incoming-call.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/sounds/alert.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/erpnext/sounds/call-disconnect.mp3 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/images/ui-states/notification-empty-state.svg HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "GET /assets/frappe/dist/js/build_events.bundle.TPIT45B3.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:28] "POST /api/method/frappe.desk.desktop.get_workspace_sidebar_items HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:29] "POST /api/method/frappe.desk.doctype.notification_log.notification_log.get_notification_logs HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:29] "[33mGET /socket.io/?EIO=4&transport=polling&t=PR8VSXe HTTP/1.1[0m" 404 -
+10.42.0.142 - - [13/May/2025 12:43:29] "GET /api/method/frappe.desk.doctype.event.event.get_events?start=2025-05-13&end=2025-05-13&_=1747120408152 HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:29] "GET /assets/frappe/images/ui-states/event-empty-state.svg HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:30] "[33mGET /socket.io/?EIO=4&transport=polling&t=PR8VS_J HTTP/1.1[0m" 404 -
+10.42.0.142 - - [13/May/2025 12:43:30] "POST /api/method/frappe.desk.desktop.get_desktop_page HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:31] "GET /assets/frappe/dist/js/video_player.bundle.IOEIXC2G.js HTTP/1.1" 200 -
+10.42.0.142 - - [13/May/2025 12:43:32] "[33mGET /socket.io/?EIO=4&transport=polling&t=PR8VTPt HTTP/1.1[0m" 404 -
+10.42.0.142 - - [13/May/2025 12:43:35] "[33mGET /socket.io/?EIO=4&transport=polling&t=PR8VU6w HTTP/1.1[0m" 404 -
+10.42.0.142 - - [13/May/2025 12:43:39] "POST /api/method/frappe.desk.doctype.route_history.route_history.deferred_insert HTTP/1.1" 200 -
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/vinton/vinton/vinton/report/task_progress_chart/task_progress_chart.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179

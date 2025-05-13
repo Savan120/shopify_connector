@@ -1,0 +1,167 @@
+{
+ "Sales Order": [
+  {
+   "default": "0",
+   "dt": "Sales Order",
+   "fieldname": "is_reverse_charge",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "insert_after": "skip_delivery_note",
+   "is_system_generated": 1,
+   "label": "Is Reverse Charge",
+   "module": "Shopify Connector"
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Sales Order",
+   "fieldname": "gst_breakup_table",
+   "fieldtype": "Text Editor",
+   "insert_after": "section_gst_breakup",
+   "is_system_generated": 1,
+   "label": "GST Breakup Table",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "section_gst_breakup",
+   "fieldtype": "Section Break",
+   "insert_after": "other_charges_calculation",
+   "is_system_generated": 1,
+   "label": "GST Breakup",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Sales Order",
+   "fetch_from": "company_address.gstin",
+   "fieldname": "company_gstin",
+   "fieldtype": "Data",
+   "insert_after": "company_address",
+   "is_system_generated": 1,
+   "label": "Company GSTIN",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "place_of_supply",
+   "fieldtype": "Autocomplete",
+   "insert_after": "gst_category",
+   "is_system_generated": 1,
+   "label": "Place of Supply",
+   "module": "Shopify Connector",
+   "options": "01-Jammu and Kashmir\n02-Himachal Pradesh\n03-Punjab\n04-Chandigarh\n05-Uttarakhand\n06-Haryana\n07-Delhi\n08-Rajasthan\n09-Uttar Pradesh\n10-Bihar\n11-Sikkim\n12-Arunachal Pradesh\n13-Nagaland\n14-Manipur\n15-Mizoram\n16-Tripura\n17-Meghalaya\n18-Assam\n19-West Bengal\n20-Jharkhand\n21-Odisha\n22-Chhattisgarh\n23-Madhya Pradesh\n24-Gujarat\n26-Dadra and Nagar Haveli and Daman and Diu\n27-Maharashtra\n29-Karnataka\n30-Goa\n31-Lakshadweep Islands\n32-Kerala\n33-Tamil Nadu\n34-Puducherry\n35-Andaman and Nicobar Islands\n36-Telangana\n37-Andhra Pradesh\n38-Ladakh\n96-Other Countries\n97-Other Territory"
+  },
+  {
+   "dt": "Sales Order",
+   "fetch_from": "customer_address.gst_category",
+   "fieldname": "gst_category",
+   "fieldtype": "Data",
+   "insert_after": "billing_address_gstin",
+   "is_system_generated": 1,
+   "label": "GST Category",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Sales Order",
+   "fetch_from": "customer_address.gstin",
+   "fieldname": "billing_address_gstin",
+   "fieldtype": "Data",
+   "insert_after": "address_display",
+   "is_system_generated": 1,
+   "label": "Billing Address GSTIN",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "gst_col_break",
+   "fieldtype": "Column Break",
+   "insert_after": "ecommerce_gstin",
+   "is_system_generated": 1,
+   "module": "Shopify Connector"
+  },
+  {
+   "allow_on_submit": 1,
+   "depends_on": "eval:gst_settings.enable_sales_through_ecommerce_operators && doc.ecommerce_gstin",
+   "dt": "Sales Order",
+   "fieldname": "ecommerce_supply_type",
+   "fieldtype": "Data",
+   "insert_after": "ecommerce_gstin",
+   "is_system_generated": 1,
+   "label": "E-commerce Supply Type",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:gst_settings.enable_sales_through_ecommerce_operators",
+   "dt": "Sales Order",
+   "fieldname": "ecommerce_gstin",
+   "fieldtype": "Data",
+   "insert_after": "gst_section",
+   "is_system_generated": 1,
+   "label": "E-commerce GSTIN",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "gst_section",
+   "fieldtype": "Section Break",
+   "insert_after": "gst_vehicle_type",
+   "is_system_generated": 1,
+   "label": "GST Details",
+   "module": "Shopify Connector"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.gst_category == \"SEZ\" || (doc.gst_category == \"Overseas\" && doc.place_of_supply == \"96-Other Countries\")",
+   "dt": "Sales Order",
+   "fieldname": "is_export_with_gst",
+   "fieldtype": "Check",
+   "insert_after": "is_reverse_charge",
+   "is_system_generated": 1,
+   "label": "Is Export With Payment of GST",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "shopify_id",
+   "fieldtype": "Data",
+   "is_system_generated": 1,
+   "label": "Shopify ID",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "shopify_order_status",
+   "fieldtype": "Small Text",
+   "insert_after": "shopify_order_number",
+   "is_system_generated": 1,
+   "label": "Shopify Order Status",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "shopify_order_number",
+   "fieldtype": "Small Text",
+   "insert_after": "shopify_order_id",
+   "is_system_generated": 1,
+   "label": "Shopify Order Number",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Sales Order",
+   "fieldname": "shopify_order_id",
+   "fieldtype": "Small Text",
+   "insert_after": "title",
+   "is_system_generated": 1,
+   "label": "Shopify Order Id",
+   "module": "Shopify Connector",
+   "read_only": 1
+  }
+ ]
+}
