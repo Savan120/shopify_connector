@@ -288,8 +288,8 @@ def get_order(self):
 				frappe.throw(_(f"Not Customer Available in Shopify Order !! Please check the order id {order_id}"))
 			else:
 				link_customer_and_address( raw_shipping_data, customer_name, contact_email)
-				link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link)
-				create_sales_order(order_id, shopify_connector_setting, customer_name, sys_lang,line_items,shipping_lines, tax_lines_amount, discount_amount, discount_per, date_created)
+				# link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link)
+				# create_sales_order(order_id, shopify_connector_setting, customer_name, sys_lang,line_items,shipping_lines, tax_lines_amount, discount_amount, discount_per, date_created)
 
 	else:
 		frappe.throw(_("Shopify Order is not available !!"))
@@ -310,31 +310,100 @@ def link_customer_and_address( raw_shipping_data, customer_name, contact_email):
 		customer.flags.ignore_mandatory = True
 		customer.save()
 
-def link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link):
-	for item_data in items_list:
-		item_shopify_com_id = cstr(item_data.get("product_id"))
-		# image_src
-		if not frappe.db.get_value("Item", {"shopify_id": item_shopify_com_id}, "name"):
-			# Create Item
-			item = frappe.new_doc("Item")
-			item.item_code = _("Shopify - {0}", sys_lang).format(item_shopify_com_id)
-			item.stock_uom = shopify_connector_setting.uom or _("Nos", sys_lang)
-			item.item_group = _("Shopify Products", sys_lang)
+# def link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link):
+# 	for item_data in items_list:
+# 		item_shopify_com_id = cstr(item_data.get("product_id"))
+# 		# image_src
+# 		if not frappe.db.get_value("Item", {"shopify_id": item_shopify_com_id}, "name"):
+# 			# Create Item
+# 			item = frappe.new_doc("Item")
+# 			item.item_code = _("Shopify - {0}", sys_lang).format(item_shopify_com_id)
+# 			item.stock_uom = shopify_connector_setting.uom or _("Nos", sys_lang)
+# 			item.item_group = _("Shopify Products", sys_lang)
 
-			item.item_name = item_data.get("name")
-			item.shopify_id = item_shopify_com_id
+# 			item.item_name = item_data.get("name")
+# 			item.shopify_id = item_shopify_com_id
 
-			#Upload image from image_src
-			if img_link:
-				file_doc = frappe.get_doc({
-					"doctype": "File",
-					"file_url": img_link,
-					"is_private": 0  # Set to 0 to make it accessible to all users
-				})
-				file_doc.insert()
-				item.image = file_doc.file_url
-			item.flags.ignore_mandatory = True
-			item.save()
+# 			#Upload image from image_src
+# 			if img_link:
+# 				file_doc = frappe.get_doc({
+# 					"doctype": "File",
+# 					"file_url": img_link,
+# 					"is_private": 0  # Set to 0 to make it accessible to all users
+# 				})
+# 				file_doc.insert()
+# 				item.image = file_doc.file_url
+# 			item.flags.ignore_mandatory = True
+# 			item.save()
+
+
+# from shopify_connector.shopify_connector.customisation.api.webhook.product_creation
+# @frappe.whitelist()
+# def sync_all_products_from_shopify():
+#     settings = frappe.get_doc("Shopify Connector Setting")
+#     shop_url = settings.shop_url
+#     access_token = settings.access_token
+
+#     headers = {
+#         "X-Shopify-Access-Token": access_token,
+#         "Content-Type": "application/json"
+#     }
+
+#     page_info = None
+#     base_url = f"https://{shop_url}/admin/api/2025-04/products.json?limit=250"
+#     created = []
+#     skipped = []
+
+#     while True:
+#         url = base_url
+#         if page_info:
+#             url += f"&page_info={page_info}"
+
+#         response = requests.get(url, headers=headers)
+#         if response.status_code != 200:
+#             frappe.throw(f"Failed to fetch products from Shopify: {response.text}")
+
+#         data = response.json()
+#         products = data.get("products", [])
+
+#         if not products:
+#             break
+
+#         for product in products:
+#             if frappe.db.exists("Item", {"shopify_id": product.get("id")}):
+#                 skipped.append(product.get("title"))
+#                 continue
+
+#             # Convert product data to JSON and simulate webhook-style POST
+#             frappe.local.request._data = product
+#             frappe.local.form_dict = product
+#             try:
+#                 product_creation()
+#                 created.append(product.get("title"))
+#             except Exception as e:
+#                 frappe.log_error(str(e), f"Product Creation Failed - {product.get('title')}")
+
+#         # Pagination - Get 'Link' header for next page
+#         link_header = response.headers.get("Link", "")
+#         if 'rel="next"' in link_header:
+#             import re
+#             match = re.search(r'<([^>]+)>; rel="next"', link_header)
+#             if match:
+#                 next_url = match.group(1)
+#                 page_info_match = re.search(r'page_info=([^&]+)', next_url)
+#                 page_info = page_info_match.group(1) if page_info_match else None
+#             else:
+#                 break
+#         else:
+#             break
+
+#     return {
+#         "created": created,
+#         "skipped": skipped,
+#         "message": f"{len(created)} products created, {len(skipped)} skipped (already exist)."
+#     }
+
+
 
 
 @frappe.whitelist()
