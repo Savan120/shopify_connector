@@ -143,9 +143,9 @@ doc_events = {
 # ---------------
 
 # scheduler_events = {
-#	"all": [
-#		"shopify_connector.tasks.all"
-#	],
+# 	"* * * * *": [
+# 		"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.get_shopify_location"
+# 	],
 #	"daily": [
 #		"shopify_connector.tasks.daily"
 #	],

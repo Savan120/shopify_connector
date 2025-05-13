@@ -1,0 +1,13 @@
+{
+ "Warehouse": [
+  {
+   "dt": "Warehouse",
+   "fieldname": "custom_shopify_id",
+   "fieldtype": "Data",
+   "insert_after": "warehouse_name",
+   "label": "Shopify ID",
+   "module": "Shopify Connector",
+   "read_only": 1
+  }
+ ]
+}

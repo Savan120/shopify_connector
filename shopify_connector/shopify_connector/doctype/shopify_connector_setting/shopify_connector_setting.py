@@ -13,302 +13,345 @@ import datetime
 
 
 from shopify_connector.shopify_connector.constants import (
-	ADDRESS_ID_FIELD,
-	CUSTOMER_ID_FIELD,
-	FULLFILLMENT_ID_FIELD,
-	ITEM_SELLING_RATE_FIELD,
-	ORDER_ID_FIELD,
-	ORDER_ITEM_DISCOUNT_FIELD,
-	ORDER_NUMBER_FIELD,
-	ORDER_STATUS_FIELD,
-	SUPPLIER_ID_FIELD,
+    ADDRESS_ID_FIELD,
+    CUSTOMER_ID_FIELD,
+    FULLFILLMENT_ID_FIELD,
+    ITEM_SELLING_RATE_FIELD,
+    ORDER_ID_FIELD,
+    ORDER_ITEM_DISCOUNT_FIELD,
+    ORDER_NUMBER_FIELD,
+    ORDER_STATUS_FIELD,
+    SUPPLIER_ID_FIELD,
 )
 
 class ShopifyConnectorSetting(Document):
-	
-	def validate(self):
-		if self.enable_shopify:
-			setup_custom_fields()
-			create_delete_custom_fields(self)
-			get_order(self) 
+    
+    def validate(self):
+        if self.enable_shopify:
+            get_shopify_location()
+            setup_custom_fields()
+            create_delete_custom_fields(self)
+            get_order(self) 
 
 def setup_custom_fields():
-	custom_fields = {
-		"Item": [
-			dict(
-				fieldname=ITEM_SELLING_RATE_FIELD,
-				label="Shopify Selling Rate",
-				fieldtype="Currency",
-				insert_after="standard_rate",
-			)
-		],
-		"Customer": [
-			dict(
-				fieldname=CUSTOMER_ID_FIELD,
-				label="Shopify Customer Id",
-				fieldtype="Data",
-				insert_after="series",
-				read_only=1,
-				print_hide=1,
-			)
-		],
-		"Supplier": [
-			dict(
-				fieldname=SUPPLIER_ID_FIELD,
-				label="Shopify Supplier Id",
-				fieldtype="Data",
-				insert_after="supplier_name",
-				read_only=1,
-				print_hide=1,
-			)
-		],
-		"Address": [
-			dict(
-				fieldname=ADDRESS_ID_FIELD,
-				label="Shopify Address Id",
-				fieldtype="Data",
-				insert_after="fax",
-				read_only=1,
-				print_hide=1,
-			)
-		],
-		"Sales Order": [
-			dict(
-				fieldname=ORDER_ID_FIELD,
-				label="Shopify Order Id",
-				fieldtype="Small Text",
-				insert_after="title",
-				read_only=1,
-				print_hide=1,
-			),
-			dict(
-				fieldname=ORDER_NUMBER_FIELD,
-				label="Shopify Order Number",
-				fieldtype="Small Text",
-				insert_after=ORDER_ID_FIELD,
-				read_only=1,
-				print_hide=1,
-			),
-			dict(
-				fieldname=ORDER_STATUS_FIELD,
-				label="Shopify Order Status",
-				fieldtype="Small Text",
-				insert_after=ORDER_NUMBER_FIELD,
-				read_only=1,
-				print_hide=1,
-			),
-		],
-		"Sales Order Item": [
-			dict(
-				fieldname=ORDER_ITEM_DISCOUNT_FIELD,
-				label="Shopify Discount per unit",
-				fieldtype="Float",
-				insert_after="discount_and_margin",
-				read_only=1,
-			),
-		],
-		"Delivery Note": [
-			dict(
-				fieldname=ORDER_ID_FIELD,
-				label="Shopify Order Id",
-				fieldtype="Small Text",
-				insert_after="title",
-				read_only=1,
-				print_hide=1,
-			),
-			dict(
-				fieldname=ORDER_NUMBER_FIELD,
-				label="Shopify Order Number",
-				fieldtype="Small Text",
-				insert_after=ORDER_ID_FIELD,
-				read_only=1,
-				print_hide=1,
-			),
-			dict(
-				fieldname=ORDER_STATUS_FIELD,
-				label="Shopify Order Status",
-				fieldtype="Small Text",
-				insert_after=ORDER_NUMBER_FIELD,
-				read_only=1,
-				print_hide=1,
-			),
-			dict(
-				fieldname=FULLFILLMENT_ID_FIELD,
-				label="Shopify Fulfillment Id",
-				fieldtype="Small Text",
-				insert_after="title",
-				read_only=1,
-				print_hide=1,
-			),
-		],
-		"Sales Invoice": [
-			dict(
-				fieldname=ORDER_ID_FIELD,
-				label="Shopify Order Id",
-				fieldtype="Small Text",
-				insert_after="title",
-				read_only=1,
-				print_hide=1,
-			),
-			dict(
-				fieldname=ORDER_NUMBER_FIELD,
-				label="Shopify Order Number",
-				fieldtype="Small Text",
-				insert_after=ORDER_ID_FIELD,
-				read_only=1,
-				print_hide=1,
-			),
-			dict(
-				fieldname=ORDER_STATUS_FIELD,
-				label="Shopify Order Status",
-				fieldtype="Small Text",
-				insert_after=ORDER_ID_FIELD,
-				read_only=1,
-				print_hide=1,
-			),
-		],
-	}
-	create_custom_fields(custom_fields)
+    custom_fields = {
+        "Item": [
+            dict(
+                fieldname=ITEM_SELLING_RATE_FIELD,
+                label="Shopify Selling Rate",
+                fieldtype="Currency",
+                insert_after="standard_rate",
+            )
+        ],
+        "Customer": [
+            dict(
+                fieldname=CUSTOMER_ID_FIELD,
+                label="Shopify Customer Id",
+                fieldtype="Data",
+                insert_after="series",
+                read_only=1,
+                print_hide=1,
+            )
+        ],
+        "Supplier": [
+            dict(
+                fieldname=SUPPLIER_ID_FIELD,
+                label="Shopify Supplier Id",
+                fieldtype="Data",
+                insert_after="supplier_name",
+                read_only=1,
+                print_hide=1,
+            )
+        ],
+        "Address": [
+            dict(
+                fieldname=ADDRESS_ID_FIELD,
+                label="Shopify Address Id",
+                fieldtype="Data",
+                insert_after="fax",
+                read_only=1,
+                print_hide=1,
+            )
+        ],
+        "Sales Order": [
+            dict(
+                fieldname=ORDER_ID_FIELD,
+                label="Shopify Order Id",
+                fieldtype="Small Text",
+                insert_after="title",
+                read_only=1,
+                print_hide=1,
+            ),
+            dict(
+                fieldname=ORDER_NUMBER_FIELD,
+                label="Shopify Order Number",
+                fieldtype="Small Text",
+                insert_after=ORDER_ID_FIELD,
+                read_only=1,
+                print_hide=1,
+            ),
+            dict(
+                fieldname=ORDER_STATUS_FIELD,
+                label="Shopify Order Status",
+                fieldtype="Small Text",
+                insert_after=ORDER_NUMBER_FIELD,
+                read_only=1,
+                print_hide=1,
+            ),
+        ],
+        "Sales Order Item": [
+            dict(
+                fieldname=ORDER_ITEM_DISCOUNT_FIELD,
+                label="Shopify Discount per unit",
+                fieldtype="Float",
+                insert_after="discount_and_margin",
+                read_only=1,
+            ),
+        ],
+        "Delivery Note": [
+            dict(
+                fieldname=ORDER_ID_FIELD,
+                label="Shopify Order Id",
+                fieldtype="Small Text",
+                insert_after="title",
+                read_only=1,
+                print_hide=1,
+            ),
+            dict(
+                fieldname=ORDER_NUMBER_FIELD,
+                label="Shopify Order Number",
+                fieldtype="Small Text",
+                insert_after=ORDER_ID_FIELD,
+                read_only=1,
+                print_hide=1,
+            ),
+            dict(
+                fieldname=ORDER_STATUS_FIELD,
+                label="Shopify Order Status",
+                fieldtype="Small Text",
+                insert_after=ORDER_NUMBER_FIELD,
+                read_only=1,
+                print_hide=1,
+            ),
+            dict(
+                fieldname=FULLFILLMENT_ID_FIELD,
+                label="Shopify Fulfillment Id",
+                fieldtype="Small Text",
+                insert_after="title",
+                read_only=1,
+                print_hide=1,
+            ),
+        ],
+        "Sales Invoice": [
+            dict(
+                fieldname=ORDER_ID_FIELD,
+                label="Shopify Order Id",
+                fieldtype="Small Text",
+                insert_after="title",
+                read_only=1,
+                print_hide=1,
+            ),
+            dict(
+                fieldname=ORDER_NUMBER_FIELD,
+                label="Shopify Order Number",
+                fieldtype="Small Text",
+                insert_after=ORDER_ID_FIELD,
+                read_only=1,
+                print_hide=1,
+            ),
+            dict(
+                fieldname=ORDER_STATUS_FIELD,
+                label="Shopify Order Status",
+                fieldtype="Small Text",
+                insert_after=ORDER_ID_FIELD,
+                read_only=1,
+                print_hide=1,
+            ),
+        ],
+    }
+    create_custom_fields(custom_fields)
 def create_delete_custom_fields(self):
-	create_custom_fields(
-		{
-			("Customer", "Sales Order", "Item", "Address"): dict(
-				fieldname="shopify_id",
-				label="Shopify ID",
-				fieldtype="Data",
-				read_only=1,
-				print_hide=1,
-			),
-			("Customer", "Address"): dict(
-				fieldname="shopify_email",
-				label="Shopify Email",
-				fieldtype="Data",
-				read_only=1,
-				print_hide=1,
-			),
-		}
-	)
-	if not frappe.get_value("Item Group", {"name": _("Shopify Products")}):
-		item_group = frappe.new_doc("Item Group")
-		item_group.item_group_name = _("Shopify Products")
-		item_group.parent_item_group = get_root_of("Item Group")
-		item_group.insert()
+    create_custom_fields(
+        {
+            ("Customer", "Sales Order", "Item", "Address"): dict(
+                fieldname="shopify_id",
+                label="Shopify ID",
+                fieldtype="Data",
+                read_only=1,
+                print_hide=1,
+            ),
+            ("Customer", "Address"): dict(
+                fieldname="shopify_email",
+                label="Shopify Email",
+                fieldtype="Data",
+                read_only=1,
+                print_hide=1,
+            ),
+        }
+    )
+    if not frappe.get_value("Item Group", {"name": _("Shopify Products")}):
+        item_group = frappe.new_doc("Item Group")
+        item_group.item_group_name = _("Shopify Products")
+        item_group.parent_item_group = get_root_of("Item Group")
+        item_group.insert()
+  
+ 
+
+def get_shopify_location():
+    shopify_keys = frappe.get_single("Shopify Connector Setting")
+    SHOPIFY_API_KEY = shopify_keys.api_key
+    SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
+    SHOPIFY_STORE_URL = shopify_keys.shop_url
+    SHOPIFY_API_VERSION = "2024-04"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
+    }
+    url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
+    print(">>>>>>>>>>>>>>>>>>>>..",url)
+    response = requests.get(url, headers=headers, verify=False)
+    print(">>>>>>>>>>>>>>>>>>>>..",response)
+    if response.status_code == 200:
+        locations = response.json().get("locations", [])
+        for location in locations:
+            # get_warehouse = frappe.get_value("Warehouse", {"custom_shopify_id": location.get("id")})
+            # if not get_warehouse:
+            warehouse = frappe.new_doc("Warehouse")
+            warehouse.warehouse_name = location.get("name")
+            warehouse.address_line_1 = location.get("address1")
+            warehouse.address_line_2 = location.get("address2")
+            warehouse.city = location.get("city")
+            warehouse.disabled = location.get("active")
+            warehouse.phone_no = location.get("phone")
+            warehouse.state = location.get("province")
+            warehouse.pin = location.get("zip")
+            warehouse.custom_shopify_id = location.get("id")
+            warehouse.insert(ignore_permissions=True)
+            print(warehouse.__dict__)
+        else:
+            frappe.log_error("No locations found in Shopify.", "Shopify Location Error")
+            return None
+    else:
+        frappe.log_error(f"Failed to fetch locations from Shopify: {response.text}", "Shopify Location Error")
+        return None
+    
+
 
 def get_order(self):
-	api_key = self.api_key
-	password = self.access_token
-	shopify_url = self.shop_url
-	# Construct the endpoint URL
-	endpoint = f"https://{shopify_url}/admin/api/2024-01/orders.json"
+    api_key = self.api_key
+    password = self.access_token
+    shopify_url = self.shop_url
+    # Construct the endpoint URL
+    endpoint = f"https://{shopify_url}/admin/api/2024-01/orders.json"
 
-	# Set request headers
-	headers = {
-		"X-Shopify-Access-Token": password,
-		"Content-Type": "application/json"
-	}
-	response = requests.get(endpoint, headers=headers, verify=False)
-	orders = response.json()["orders"]
-	if orders:
-		shopify_connector_setting = frappe.get_doc("Shopify Connector Setting")
-		sys_lang = frappe.get_single("System Settings").language or "en"
-		for order_data in orders:
-			order_id = order_data.get('order_number')
+    # Set request headers
+    headers = {
+        "X-Shopify-Access-Token": password,
+        "Content-Type": "application/json"
+    }
+    response = requests.get(endpoint, headers=headers, verify=False)
+    orders = response.json()["orders"]
+    if orders:
+        shopify_connector_setting = frappe.get_doc("Shopify Connector Setting")
+        sys_lang = frappe.get_single("System Settings").language or "en"
+        for order_data in orders:
+            order_id = order_data.get('order_number')
 
-			shipping = order_data.get('shipping')
+            shipping = order_data.get('shipping')
 
-			line_items = order_data.get('line_items')
-			items_list = line_items
+            line_items = order_data.get('line_items')
+            items_list = line_items
 
-			# Make a request to fetch product details
-			images_src = []
-			for image_item in line_items:
-				idd = image_item.get('product_id')
-				response = requests.get(f'https://{shopify_url}/admin/api/2021-10/products/{idd}.json', headers={'X-Shopify-Access-Token': password},verify=False)
+            # Make a request to fetch product details
+            images_src = []
+            for image_item in line_items:
+                idd = image_item.get('product_id')
+                response = requests.get(f'https://{shopify_url}/admin/api/2021-10/products/{idd}.json', headers={'X-Shopify-Access-Token': password},verify=False)
 
-				if response.status_code == 200:
-					product_data = response.json()['product']
-					# Extract image URLs
-					images_src += [image['src'] for image in product_data['images']]
-				else:
-					print(f"Failed to fetch product details: {response.status_code} - {response.text}")
-			img_link  = images_src[0] if len(images_src)>0 else ''
+                if response.status_code == 200:
+                    product_data = response.json()['product']
+                    # Extract image URLs
+                    images_src += [image['src'] for image in product_data['images']]
+                else:
+                    print(f"Failed to fetch product details: {response.status_code} - {response.text}")
+            img_link  = images_src[0] if len(images_src)>0 else ''
 
-			billing = order_data.get('billing_address')
-			raw_billing_data = billing
+            billing = order_data.get('billing_address')
+            raw_billing_data = billing
 
-			shipping = order_data.get('shipping_address',False)
-			raw_shipping_data = shipping
+            shipping = order_data.get('shipping_address',False)
+            raw_shipping_data = shipping
 
-			contact_email = order_data.get('contact_email')
-			if raw_shipping_data:
-				customer_name = (raw_shipping_data.get("first_name") or "") + " " + (raw_shipping_data.get("last_name") or "")
+            contact_email = order_data.get('contact_email')
+            if raw_shipping_data:
+                customer_name = (raw_shipping_data.get("first_name") or "") + " " + (raw_shipping_data.get("last_name") or "")
 
-			else: 
-				customer_name = ""
+            else: 
+                customer_name = ""
 
-			discount_info = order_data.get('discount_applications')
-			disc_type = ''
-			for dis_value in discount_info:
-				disc_type = dis_value.get('value_type')
-				dis_value.get('value')
-				disc_type = dis_value.get('value_type')
+            discount_info = order_data.get('discount_applications')
+            disc_type = ''
+            for dis_value in discount_info:
+                disc_type = dis_value.get('value_type')
+                dis_value.get('value')
+                disc_type = dis_value.get('value_type')
 
-			discount_per = 0
-			if disc_type == 'percentage':
-				if len(discount_info) > 0 :
-					for line_price in discount_info:
-						discount_per+= float(line_price.get('value'))
-			
+            discount_per = 0
+            if disc_type == 'percentage':
+                if len(discount_info) > 0 :
+                    for line_price in discount_info:
+                        discount_per+= float(line_price.get('value'))
+            
 
-			discount_codes = order_data.get('discount_codes')
-			discount_amount = 0
-			if disc_type == 'fixed_amount':
-				if len(discount_codes) > 0 :
-					for line_price in discount_codes:
-						discount_amount+= float(line_price.get('amount'))
+            discount_codes = order_data.get('discount_codes')
+            discount_amount = 0
+            if disc_type == 'fixed_amount':
+                if len(discount_codes) > 0 :
+                    for line_price in discount_codes:
+                        discount_amount+= float(line_price.get('amount'))
 
 
-			tax_lines = order_data.get('tax_lines')
+            tax_lines = order_data.get('tax_lines')
 
-			tax_lines_amount = 0
-			for tl in tax_lines: 
-				tax_lines_amount = tl.get('price')
+            tax_lines_amount = 0
+            for tl in tax_lines: 
+                tax_lines_amount = tl.get('price')
 
-			shipping_lines_data = order_data.get('shipping_lines')
-		
-			shipping_lines = 0
-			if len(shipping_lines_data) > 0 :
-				for line_price in shipping_lines_data:
-					shipping_lines+= float(line_price.get('price'))
+            shipping_lines_data = order_data.get('shipping_lines')
+        
+            shipping_lines = 0
+            if len(shipping_lines_data) > 0 :
+                for line_price in shipping_lines_data:
+                    shipping_lines+= float(line_price.get('price'))
 
-			date_created = order_data.get('created_at').split("T")
-			date_created = date_created[0]
+            date_created = order_data.get('created_at').split("T")
+            date_created = date_created[0]
 
-			if not customer_name:
-				frappe.throw(_(f"Not Customer Available in Shopify Order !! Please check the order id {order_id}"))
-			else:
-				link_customer_and_address( raw_shipping_data, customer_name, contact_email)
-				# link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link)
-				# create_sales_order(order_id, shopify_connector_setting, customer_name, sys_lang,line_items,shipping_lines, tax_lines_amount, discount_amount, discount_per, date_created)
+            if not customer_name:
+                frappe.throw(_(f"Not Customer Available in Shopify Order !! Please check the order id {order_id}"))
+            else:
+                link_customer_and_address( raw_shipping_data, customer_name, contact_email)
+                # link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link)
+                # create_sales_order(order_id, shopify_connector_setting, customer_name, sys_lang,line_items,shipping_lines, tax_lines_amount, discount_amount, discount_per, date_created)
 
-	else:
-		frappe.throw(_("Shopify Order is not available !!"))
+    else:
+        frappe.throw(_("Shopify Order is not available !!"))
 
 def link_customer_and_address( raw_shipping_data, customer_name, contact_email):
-	if raw_shipping_data:
-		customer_shopify_email = contact_email
-		customer_exists = frappe.get_value("Customer", {"shopify_email": customer_shopify_email})
-		if not customer_exists:
-			customer = frappe.new_doc("Customer")
-		else:
-			customer = frappe.get_doc("Customer", {"shopify_email": customer_shopify_email})
-			old_name = customer.customer_name
+    if raw_shipping_data:
+        customer_shopify_email = contact_email
+        customer_exists = frappe.get_value("Customer", {"shopify_email": customer_shopify_email})
+        if not customer_exists:
+            customer = frappe.new_doc("Customer")
+        else:
+            customer = frappe.get_doc("Customer", {"shopify_email": customer_shopify_email})
+            old_name = customer.customer_name
 
-		customer.customer_name = customer_name
-		customer.shopify_email = customer_shopify_email
-		customer.shopify_email = customer_shopify_email
-		customer.flags.ignore_mandatory = True
-		customer.save()
+        customer.customer_name = customer_name
+        customer.shopify_email = customer_shopify_email
+        customer.shopify_email = customer_shopify_email
+        customer.flags.ignore_mandatory = True
+        customer.save()
 
 # def link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link):
 # 	for item_data in items_list:
@@ -408,90 +451,90 @@ def link_customer_and_address( raw_shipping_data, customer_name, contact_email):
 
 @frappe.whitelist()
 def get_series():
-	return {
-		"sales_order_series": frappe.get_meta("Sales Order").get_options("naming_series") or "SO-SPF-",
-	}
+    return {
+        "sales_order_series": frappe.get_meta("Sales Order").get_options("naming_series") or "SO-SPF-",
+    }
 
 def create_sales_order(order_id, shopify_connector_setting, customer_name, sys_lang, line_items, shipping_lines, tax_lines_amount, discount_amount, discount_per, date_created=None):
-	already_synched_ids = frappe.db.get_list('Sales Order', filters=[('shopify_id', '=', order_id)], fields=['name'], as_list=True, ignore_permissions=True)
+    already_synched_ids = frappe.db.get_list('Sales Order', filters=[('shopify_id', '=', order_id)], fields=['name'], as_list=True, ignore_permissions=True)
 
-	if not already_synched_ids:
-		new_sales_order = frappe.new_doc("Sales Order")
-		new_sales_order.customer = customer_name
-		new_sales_order.po_no = order_id
-		new_sales_order.shopify_id = order_id
-		new_sales_order.naming_series = shopify_connector_setting.sales_order_series or "SO-SPF-"
-		
+    if not already_synched_ids:
+        new_sales_order = frappe.new_doc("Sales Order")
+        new_sales_order.customer = customer_name
+        new_sales_order.po_no = order_id
+        new_sales_order.shopify_id = order_id
+        new_sales_order.naming_series = shopify_connector_setting.sales_order_series or "SO-SPF-"
+        
 
-		created_date = date_created
-		new_sales_order.transaction_date = created_date
-		delivery_after = shopify_connector_setting.delivery_after_days or 7
-		new_sales_order.delivery_date = frappe.utils.add_days(created_date, delivery_after)
-		new_delivery_date = new_sales_order.delivery_date
-		new_delivery_date = datetime.datetime.strptime(new_delivery_date, "%Y-%m-%d")
-		new_formmat_delivery_date = new_delivery_date.date()
-		final_delivery_date = datetime.datetime.strptime(str(new_formmat_delivery_date), "%Y-%m-%d")
+        created_date = date_created
+        new_sales_order.transaction_date = created_date
+        delivery_after = shopify_connector_setting.delivery_after_days or 7
+        new_sales_order.delivery_date = frappe.utils.add_days(created_date, delivery_after)
+        new_delivery_date = new_sales_order.delivery_date
+        new_delivery_date = datetime.datetime.strptime(new_delivery_date, "%Y-%m-%d")
+        new_formmat_delivery_date = new_delivery_date.date()
+        final_delivery_date = datetime.datetime.strptime(str(new_formmat_delivery_date), "%Y-%m-%d")
 
-		new_sales_order.company = shopify_connector_setting.company
-		set_items_in_sales_order(new_sales_order, shopify_connector_setting, order_id, sys_lang,line_items,shipping_lines,final_delivery_date, tax_lines_amount, discount_amount, discount_per)
-		new_sales_order.flags.ignore_mandatory = True
-		new_sales_order.insert(ignore_mandatory=True)
-		new_sales_order.submit()
+        new_sales_order.company = shopify_connector_setting.company
+        set_items_in_sales_order(new_sales_order, shopify_connector_setting, order_id, sys_lang,line_items,shipping_lines,final_delivery_date, tax_lines_amount, discount_amount, discount_per)
+        new_sales_order.flags.ignore_mandatory = True
+        new_sales_order.insert(ignore_mandatory=True)
+        new_sales_order.submit()
 
-		frappe.db.commit()
+        frappe.db.commit()
 
 def set_items_in_sales_order(new_sales_order, shopify_connector_setting, order_id, sys_lang,line_items, shipping_lines, final_delivery_date, tax_lines_amount, discount_amount, discount_per):
-	company_abbr = frappe.db.get_value("Company", shopify_connector_setting.company, "abbr")
+    company_abbr = frappe.db.get_value("Company", shopify_connector_setting.company, "abbr")
 
-	default_warehouse = _("Stores - {0}", sys_lang).format(company_abbr)
-	if not frappe.db.exists("Warehouse", default_warehouse) and not shopify_connector_setting.warehouse:
-		frappe.throw(_("Please set Warehouse in shopify_connector_setting"))
+    default_warehouse = _("Stores - {0}", sys_lang).format(company_abbr)
+    if not frappe.db.exists("Warehouse", default_warehouse) and not shopify_connector_setting.warehouse:
+        frappe.throw(_("Please set Warehouse in shopify_connector_setting"))
 
-	# total_amount = 0.0
-	for item in line_items:
-		shopify_item_id = item.get("product_id")
-		found_item = frappe.get_doc("Item", {"shopify_id": cstr(shopify_item_id)})		
-	
-		ordered_items_tax = tax_lines_amount
-
-
-		new_sales_order.append(
-			"items",
-			{
-				"item_code": found_item.name,
-				"item_name": found_item.item_name,
-				"description": found_item.item_name,
-				"delivery_date": final_delivery_date,
-				"uom": shopify_connector_setting.uom or _("Nos", sys_lang),
-				"qty": item.get("quantity"),
-				"rate": item.get("price"),
-				"warehouse": shopify_connector_setting.warehouse or default_warehouse,
-			},
-		)
-	
-	new_sales_order.apply_discount_on = 'Net Total'
-	new_sales_order.additional_discount_percentage = discount_per
-	new_sales_order.discount_amount = discount_amount
+    # total_amount = 0.0
+    for item in line_items:
+        shopify_item_id = item.get("product_id")
+        found_item = frappe.get_doc("Item", {"shopify_id": cstr(shopify_item_id)})		
+    
+        ordered_items_tax = tax_lines_amount
 
 
-	add_tax_details(
-		new_sales_order, ordered_items_tax, "Ordered Item tax", shopify_connector_setting.tax_account
-	)
+        new_sales_order.append(
+            "items",
+            {
+                "item_code": found_item.name,
+                "item_name": found_item.item_name,
+                "description": found_item.item_name,
+                "delivery_date": final_delivery_date,
+                "uom": shopify_connector_setting.uom or _("Nos", sys_lang),
+                "qty": item.get("quantity"),
+                "rate": item.get("price"),
+                "warehouse": shopify_connector_setting.warehouse or default_warehouse,
+            },
+        )
+    
+    new_sales_order.apply_discount_on = 'Net Total'
+    new_sales_order.additional_discount_percentage = discount_per
+    new_sales_order.discount_amount = discount_amount
 
-	add_tax_details(
-		new_sales_order, shipping_lines, "Shipping Tax", shopify_connector_setting.f_n_f_account
-	)
+
+    add_tax_details(
+        new_sales_order, ordered_items_tax, "Ordered Item tax", shopify_connector_setting.tax_account
+    )
+
+    add_tax_details(
+        new_sales_order, shipping_lines, "Shipping Tax", shopify_connector_setting.f_n_f_account
+    )
 
 def add_tax_details(sales_order, ordered_items_tax, desc, tax_account_head=None):
-	sales_order.append(
-		"taxes",
-		{
-			"charge_type": "Actual",
-			"account_head": tax_account_head,
-			"tax_amount": ordered_items_tax,
-			"description": desc,
-		},
-	)
+    sales_order.append(
+        "taxes",
+        {
+            "charge_type": "Actual",
+            "account_head": tax_account_head,
+            "tax_amount": ordered_items_tax,
+            "description": desc,
+        },
+    )
 
 
 

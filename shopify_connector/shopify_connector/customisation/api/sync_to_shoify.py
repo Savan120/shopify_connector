@@ -721,3 +721,4 @@ def update_shopify_hsn_code(hsn_code, inventory_item_id):
 
     if response.status_code != 200:
         frappe.log_error(f"HSN update failed: {response.text}", "Shopify HSN Sync Error")
+       
