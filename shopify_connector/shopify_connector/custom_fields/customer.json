@@ -1,6 +1,25 @@
 {
  "Customer": [
   {
+   "dt": "Customer",
+   "fieldname": "pan",
+   "fieldtype": "Data",
+   "insert_after": "gstin",
+   "is_system_generated": 1,
+   "label": "PAN",
+   "module": "Shopify Connector",
+   "read_only_depends_on": "eval: doc.gstin"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "tax_details_section",
+   "fieldtype": "Section Break",
+   "insert_after": "tax_withholding_category",
+   "is_system_generated": 1,
+   "label": "Tax Details",
+   "module": "Shopify Connector"
+  },
+  {
    "default": "Unregistered",
    "dt": "Customer",
    "fieldname": "gst_category",
@@ -28,53 +47,6 @@
    "is_system_generated": 1,
    "label": "GSTIN / UIN",
    "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "tax_details_section",
-   "fieldtype": "Section Break",
-   "insert_after": "tax_tab",
-   "is_system_generated": 1,
-   "label": "Tax Details",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "pan",
-   "fieldtype": "Data",
-   "insert_after": "gstin",
-   "is_system_generated": 1,
-   "label": "PAN",
-   "module": "Shopify Connector",
-   "read_only_depends_on": "eval: doc.gstin"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "shopify_email",
-   "fieldtype": "Data",
-   "is_system_generated": 1,
-   "label": "Shopify Email",
-   "module": "Shopify Connector",
-   "read_only": 1
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "shopify_id",
-   "fieldtype": "Data",
-   "is_system_generated": 1,
-   "label": "Shopify ID",
-   "module": "Shopify Connector",
-   "read_only": 1
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "shopify_customer_id",
-   "fieldtype": "Data",
-   "insert_after": "series",
-   "is_system_generated": 1,
-   "label": "Shopify Customer Id",
-   "module": "Shopify Connector",
-   "read_only": 1
   }
  ]
 }

@@ -228,3 +228,4 @@ doc_events = {
 # auth_hooks = [
 #	"shopify_connector.auth.validate"
 # ]
+after_migrate = "shopify_connector.migrate.after_migrate"  

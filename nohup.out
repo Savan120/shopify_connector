@@ -144,3 +144,11 @@
  * Restarting with stat
  * Debugger is active!
  * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/shopify_connector/shopify_connector/hooks.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
+ * Detected change in '/home/kumel/frappe/frappe-bench/apps/shopify_connector/shopify_connector/migrate.py', reloading
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 677-785-179
