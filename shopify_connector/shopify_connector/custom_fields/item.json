@@ -2,6 +2,23 @@
  "Item": [
   {
    "dt": "Item",
+   "fieldname": "custom_variant_id",
+   "fieldtype": "Data",
+   "insert_after": "custom_inventory_item_id",
+   "label": "variant id",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_inventory_item_id",
+   "fieldtype": "Data",
+   "insert_after": "shopify_id",
+   "label": "inventory item id",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Item",
    "fieldname": "is_ineligible_for_itc",
    "fieldtype": "Check",
    "insert_after": "item_tax_section_break",
@@ -25,38 +42,20 @@
   },
   {
    "dt": "Item",
-   "fieldname": "is_non_gst",
-   "fieldtype": "Check",
-   "insert_after": "is_nil_exempt",
+   "fieldname": "shopify_id",
+   "fieldtype": "Data",
    "is_system_generated": 1,
-   "label": "Is Non GST ",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Item",
-   "fieldname": "is_nil_exempt",
-   "fieldtype": "Check",
-   "insert_after": "gst_hsn_code",
-   "is_system_generated": 1,
-   "label": "Is Nil Rated or Exempted",
-   "module": "Shopify Connector"
-  },
-  {
-   "allow_on_submit": 1,
-   "dt": "Item",
-   "fieldname": "custom_vinton_purchase_budget",
-   "fieldtype": "Table",
-   "insert_after": "custom_vinton_budget",
-   "label": "Vinton Purchase Budget",
+   "label": "Shopify ID",
    "module": "Shopify Connector",
-   "options": "Budget Vinton Purchase"
+   "read_only": 1
   },
   {
    "dt": "Item",
-   "fieldname": "custom_vinton_budget",
-   "fieldtype": "Tab Break",
-   "insert_after": "total_projected_qty",
-   "label": "Vinton Budget",
+   "fieldname": "shopify_selling_rate",
+   "fieldtype": "Currency",
+   "insert_after": "standard_rate",
+   "is_system_generated": 1,
+   "label": "Shopify Selling Rate",
    "module": "Shopify Connector"
   }
  ]
