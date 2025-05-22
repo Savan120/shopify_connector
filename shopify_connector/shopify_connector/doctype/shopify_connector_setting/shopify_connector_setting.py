@@ -28,10 +28,12 @@ class ShopifyConnectorSetting(Document):
     
     def validate(self):
         if self.enable_shopify:
-            get_shopify_location()
+            # get_shopify_location()
             setup_custom_fields()
             create_delete_custom_fields(self)
-            get_order(self) 
+            # get_order(self) 
+
+   
 
 def setup_custom_fields():
     custom_fields = {
@@ -197,45 +199,105 @@ def create_delete_custom_fields(self):
   
  
 
+# def get_shopify_location():
+#     shopify_keys = frappe.get_single("Shopify Connector Setting")
+#     SHOPIFY_API_KEY = shopify_keys.api_key
+#     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
+#     SHOPIFY_STORE_URL = shopify_keys.shop_url
+#     SHOPIFY_API_VERSION = "2024-04"
+#     headers = {
+#         "Content-Type": "application/json",
+#         "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
+#     }
+#     url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
+#     print(">>>>>>>>>>>>>>>>>>>>..",url)
+#     response = requests.get(url, headers=headers, verify=False)
+#     print(">>>>>>>>>>>>>>>>>>>>..",response)
+#     if response.status_code == 200:
+#         locations = response.json().get("locations", [])
+#         for location in locations:
+#             warehosue_active = True
+#             if location.get("active") == True:
+#                 warehosue_active = False
+#             # get_warehouse = frappe.get_value("Warehouse", {"custom_shopify_id": location.get("id")})
+#             # if not get_warehouse:
+#             # if exists:=frappe.db.exists("Warehouse", {"custom_shopify_id": location.get("id")}):
+#             #     existing_warehouse=frappe.get_doc("Warehouse",exists)
+#             # else:
+#             warehouse = frappe.new_doc("Warehouse")
+
+#             print(warehosue_active)
+#             warehouse.warehouse_name = location.get("name")
+#             warehouse.address_line_1 = location.get("address1")
+#             warehouse.address_line_2 = location.get("address2")
+#             warehouse.city = location.get("city")
+#             warehouse.disabled = warehosue_active
+#             warehouse.phone_no = location.get("phone")
+#             warehouse.state = location.get("province")
+#             warehouse.pin = location.get("zip")
+#             warehouse.custom_shopify_id = location.get("id")
+            
+#             # warehouse.save()
+#             warehouse.insert(ignore_mandatory=True)
+#             # warehouse.flags.ignore_permissions = True
+#             # warehouse.ignore_permissions=True
+#             print(warehouse.__dict__)
+#         else:
+#             frappe.log_error("No locations found in Shopify.", "Shopify Location Error")
+#             return None
+#     else:
+#         frappe.log_error(f"Failed to fetch locations from Shopify: {response.text}", "Shopify Location Error")
+#         return None
+ 
+
 def get_shopify_location():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
-    SHOPIFY_API_VERSION = "2024-04"
+    SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
     headers = {
         "Content-Type": "application/json",
         "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
     }
     url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
-    print(">>>>>>>>>>>>>>>>>>>>..",url)
+
     response = requests.get(url, headers=headers, verify=False)
-    print(">>>>>>>>>>>>>>>>>>>>..",response)
+
     if response.status_code == 200:
         locations = response.json().get("locations", [])
+
+        if not locations:
+            frappe.log_error("No locations found.")
+            return
+
         for location in locations:
-            # get_warehouse = frappe.get_value("Warehouse", {"custom_shopify_id": location.get("id")})
-            # if not get_warehouse:
-            warehouse = frappe.new_doc("Warehouse")
-            warehouse.warehouse_name = location.get("name")
+            disabled = not location.get("active", True)
+            shopify_id = location.get("id")
+            warehouse_name = location.get("name")
+
+
+            warehouse_existing = frappe.db.get_value("Warehouse", {"custom_shopify_id": shopify_id}, "name")
+            if warehouse_existing:
+                warehouse = frappe.get_doc("Warehouse", warehouse_existing)
+
+            else:
+                warehouse = frappe.new_doc("Warehouse")
+            warehouse.warehouse_name = warehouse_name
             warehouse.address_line_1 = location.get("address1")
             warehouse.address_line_2 = location.get("address2")
             warehouse.city = location.get("city")
-            warehouse.disabled = location.get("active")
-            warehouse.phone_no = location.get("phone")
             warehouse.state = location.get("province")
+            warehouse.custom_country = location.get("country_name")
             warehouse.pin = location.get("zip")
-            warehouse.custom_shopify_id = location.get("id")
-            warehouse.insert(ignore_permissions=True)
-            print(warehouse.__dict__)
-        else:
-            frappe.log_error("No locations found in Shopify.", "Shopify Location Error")
-            return None
-    else:
-        frappe.log_error(f"Failed to fetch locations from Shopify: {response.text}", "Shopify Location Error")
-        return None
-    
+            warehouse.phone_no = location.get("phone")
+            warehouse.custom_shopify_id = shopify_id
+            warehouse.disabled = disabled
+            warehouse.flags.ignore_shopify_sync = True
+            warehouse.save()
 
+    else:
+        frappe.log_error("Failed to fetch locations from Shopify")
 
 def get_order(self):
     api_key = self.api_key

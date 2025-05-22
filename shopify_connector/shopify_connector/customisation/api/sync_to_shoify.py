@@ -661,6 +661,7 @@ def send_item_to_shopify(doc, method):
     else:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
+        print("\n\nresponse",response)
         print("else last")
         if response.status_code == 201:
             shopify_product = response.json()["product"]
@@ -722,3 +723,292 @@ def update_shopify_hsn_code(hsn_code, inventory_item_id):
     if response.status_code != 200:
         frappe.log_error(f"HSN update failed: {response.text}", "Shopify HSN Sync Error")
        
+###################################################################################################
+
+
+import pycountry
+import unicodedata
+
+def clean_name(name):
+    return unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('utf-8').lower().strip()
+
+def get_country_code(country_name):
+    name_clean = clean_name(country_name)
+    
+    for country in pycountry.countries:
+        # print("\n\n\ncountry",country)
+        if clean_name(country.name) == name_clean:
+            return country.alpha_2
+    return None
+
+
+def get_country_and_state_codes(country_name, state_name):
+    country_code = get_country_code(country_name)
+    # print("\n\n\ncountry_code",country_code)
+    if not country_code:
+        return None, None
+
+    state_clean = clean_name(state_name)
+
+    for subdiv in pycountry.subdivisions.get(country_code=country_code):
+        # print("\n\n\nsubdiv",subdiv)
+        if state_clean in clean_name(subdiv.name):
+            # print("\n\n\nstate_clean",state_clean)
+            state_code = subdiv.code.split('-')[-1]  
+            # print("\n\nstate_code",state_code)
+            return country_code, state_code
+    else:
+        return frappe.throw(f"{state_name} not found in {country_name}")
+
+    # return country_code, None 
+
+
+def shopify_credentials():
+    doc=frappe.get_single("Shopify Connector Setting")
+    access_token = doc.access_token
+    url=doc.shop_url
+    version = doc.shopify_api_version
+    shopify_graph_url = f"https://{url}/admin/api/{version}/graphql.json"
+    return {"access_token":access_token,
+            "shopify_graph_url":shopify_graph_url}
+
+
+def create_shopify_location(doc, method):
+    if doc.flags.ignore_shopify_sync:
+        return
+    
+    if getattr(doc.flags, "from_shopify", False):
+        return
+    address = f"{doc.address_line_1} {doc.address_line_2 or ''}"
+    country = "India"
+    # city = doc.city or " "
+    # province = doc.state or " "
+    # postal_code = doc.pin or "000000"
+    # phone = doc.phone_no or ""
+    country_code,state_code=get_country_and_state_codes(doc.custom_country,doc.state)
+
+    query = f"""
+    mutation {{
+        locationAdd(input: {{
+            name: "{doc.name}",
+            address: {{
+                address1:"",
+                address2: "{address}",
+                city: "{doc.city}",
+                provinceCode: "{state_code}",
+                countryCode: {country_code},
+                zip: "{doc.pin if doc.pin else '000000'}"
+                phone: "{doc.phone_no if doc.phone_no else ''}"
+            }},
+            fulfillsOnlineOrders: true
+        }}) {{
+            location {{
+                id
+                name
+                address {{
+                    address1
+                    provinceCode
+                    countryCode
+                    zip
+                    phone
+                }}
+                fulfillsOnlineOrders
+            }}
+        }}
+        
+    }}
+    """
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopify_credentials().get("access_token")
+    }
+
+    response = requests.post(shopify_credentials().get("shopify_graph_url"), json={"query": query}, headers=headers)
+
+    if response.status_code != 200 or "errors" in response.json():
+        frappe.log_error(f"Shopify location creation failed: {response.text}")
+        return
+    
+    response_json = response.json()
+    data = response_json.get("data")
+    locationAdd = data.get("locationAdd") if data else None
+    location = locationAdd.get("location") if locationAdd else None
+
+    if not location:
+        frappe.log_error("No location data")
+        return
+
+    location_get = location.get("id")
+    if location_get:
+        location_id = location_get.split("/")[-1]
+        doc.custom_shopify_id = location_id
+        doc.flags.from_shopify = True  
+        doc.save(ignore_permissions=True)
+        frappe.msgprint(f"Shopify location created for warehouse {doc.name}")
+    else:
+        frappe.log_error("Shopify location ID missing ")
+
+
+def activate_deactivate_shopify_location(doc, method):
+    if doc.flags.ignore_shopify_sync:
+        return
+    shopify_id = doc.custom_shopify_id
+    if not shopify_id:
+        frappe.log_error("Missing Shopify Location ID")
+        return
+
+    location_get= f"gid://shopify/Location/{shopify_id}"
+    # status = bool(doc.disabled)    
+
+    if doc.disabled:
+        query = f"""
+        mutation {{
+            locationDeactivate(locationId: "{location_get}") {{
+                location {{
+                    id
+                    isActive
+                }}
+                locationDeactivateUserErrors {{
+                    message
+                    code
+                    field
+                }}
+            }}
+        }}
+        """
+    else:
+        query = f"""
+        mutation {{
+            locationActivate(locationId: "{location_get}") {{
+                location {{
+                    id
+                    isActive
+                }}
+            }}
+        }}
+        """
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopify_credentials().get("access_token")
+    }
+
+    response = requests.post(shopify_credentials().get("shopify_graph_url"), json={"query": query}, headers=headers)
+
+    if response.status_code != 200:
+        frappe.log_error(f"Shopify request failed: {response.text}", "Shopify Sync Error")
+        return
+    else:
+        status_msg = "deactivated" if doc.disabled else "activated"
+        frappe.msgprint(f"Shopify location {status_msg}: {doc.name}")
+
+
+
+
+def delete_shopify_location(doc, method):
+    if doc.disabled == False:
+        frappe.throw("Disable the location before deleting it from Shopify")
+    if doc.flags.ignore_shopify_sync:
+        return
+    shopify_id = doc.custom_shopify_id
+    if not shopify_id:
+        return
+
+    location_get= f"gid://shopify/Location/{shopify_id}"
+
+    query = f"""
+    mutation {{
+        locationDelete(locationId: "{location_get}") {{
+            deletedLocationId
+        }}
+    }}
+    """
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopify_credentials().get("access_token")
+    }
+
+    response = requests.post(shopify_credentials().get("shopify_graph_url"), json={"query": query}, headers=headers)
+
+    if response.status_code == 200:
+        frappe.msgprint(f"Shopify location deleted: {doc.name}")
+    else:
+        status_msg = "Deleted"
+        frappe.msgprint(f"Shopify location {status_msg}: {doc.name}")
+
+
+
+def update_shopify_location(doc, method):
+    if doc.flags.ignore_shopify_sync:
+        return
+    shopify_id = doc.custom_shopify_id
+    if not shopify_id:
+        frappe.log_error("Missing Shopify Location ID")
+        return
+
+    location_get = f"gid://shopify/Location/{shopify_id}"
+    address = f"{doc.address_line_1} {doc.address_line_2 or ''}"
+    # country = "India"
+    country_code,state_code=get_country_and_state_codes(doc.custom_country,doc.state)
+
+    # city = doc.city or " "
+    # province = doc.state or " "
+    # postal_code = doc.pin or ""
+    # phone = doc.phone_no or ""
+
+    query = """
+    mutation updateLocation($input: LocationEditInput!, $ownerId: ID!) {
+      locationEdit(input: $input, id: $ownerId) {
+        location {
+          id
+          name
+          address {
+            address1
+            address2
+            city
+            provinceCode
+            countryCode
+            zip
+            phone
+          }
+        }
+        userErrors {
+          message
+          field
+        }
+      }
+    }
+    """
+
+    variables = {
+        "input": {
+            "address": {
+                "address1": "",
+                "address2": address,
+                "city": doc.city if doc.city else "",
+                "provinceCode": state_code,
+                "countryCode": country_code,
+                "zip": doc.pin if doc.pin else "",
+                "phone": doc.phone_no if doc.phone_no else ""
+            }
+        },
+        "ownerId": location_get
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": shopify_credentials().get("access_token")
+    }
+
+    response = requests.post(shopify_credentials().get("shopify_graph_url"), json={"query": query, "variables": variables}, headers=headers)
+
+
+    if response.status_code != 200 or "errors" in response.json():
+        frappe.log_error(f"Shopify address update failed: {response.text}", "Shopify Sync Error")
+        return
+
+    # frappe.msgprint(f"Shopify location address updated for: {doc.name}")
+
+

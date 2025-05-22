@@ -25,3 +25,11 @@ frappe.ui.form.on('Shopify Connector Setting', {
         });
     }
 });
+
+
+
+
+
+
+
+

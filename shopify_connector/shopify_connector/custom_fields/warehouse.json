@@ -2,9 +2,19 @@
  "Warehouse": [
   {
    "dt": "Warehouse",
+   "fieldname": "custom_country",
+   "fieldtype": "Link",
+   "insert_after": "mobile_no",
+   "label": "Country",
+   "module": "Shopify Connector",
+   "options": "Country"
+  },
+  {
+   "dt": "Warehouse",
    "fieldname": "custom_shopify_id",
    "fieldtype": "Data",
    "insert_after": "warehouse_name",
+   "is_system_generated": 1,
    "label": "Shopify ID",
    "module": "Shopify Connector",
    "read_only": 1

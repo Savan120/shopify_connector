@@ -13,6 +13,7 @@
   "api_secret",
   "access_token",
   "shop_url",
+  "shopify_api_version",
   "uom",
   "sales_order_series",
   "column_break_suda",
@@ -24,6 +25,7 @@
   "erpnext_to_shopify_section",
   "sync_customer",
   "sync_product",
+  "sync_location",
   "column_break_tqvw",
   "sync_orders",
   "sync_invoices"
@@ -144,12 +146,23 @@
    "fieldname": "sync_invoices",
    "fieldtype": "Check",
    "label": "Sync Invoices"
+  },
+  {
+   "fieldname": "shopify_api_version",
+   "fieldtype": "Data",
+   "label": "Shopify API Version"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_location",
+   "fieldtype": "Check",
+   "label": "Sync Location"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-04-30 15:01:30.564803",
+ "modified": "2025-05-21 16:31:19.918638",
  "modified_by": "Administrator",
  "module": "Shopify Connector",
  "name": "Shopify Connector Setting",
