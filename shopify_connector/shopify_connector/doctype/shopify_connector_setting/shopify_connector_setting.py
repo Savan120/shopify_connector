@@ -31,6 +31,7 @@ class ShopifyConnectorSetting(Document):
             # get_shopify_location()
             setup_custom_fields()
             create_delete_custom_fields(self)
+            get_inv_level()
             # get_order(self) 
 
    
@@ -597,6 +598,45 @@ def add_tax_details(sales_order, ordered_items_tax, desc, tax_account_head=None)
             "description": desc,
         },
     )
+
+def get_inv_level():
+    shopify_keys = frappe.get_single("Shopify Connector Setting")
+    SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
+    SHOPIFY_STORE_URL = shopify_keys.shop_url
+    SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
+
+    shopify_location_ids = frappe.get_all(
+        "Warehouse",
+        filters={"custom_shopify_id": ["!=", ""]},
+        fields=["custom_shopify_id"]
+    )
+    print(shopify_location_ids)
+
+    headers = {
+        'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
+    }
+
+    location_ids = [loc["custom_shopify_id"] for loc in shopify_location_ids]
+
+    params = {
+        'location_ids': ','.join(location_ids),
+    }
+
+    response = requests.get(
+        f'https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/inventory_levels.json',
+        params=params,
+        headers=headers,
+    )
+    print(response)
+
+    if response.status_code != 200:
+        frappe.log_error(response.text, "Shopify Inventory Fetch Failed")
+
+    print(response.json())
+
+    
+
+    return response.json()
 
 
 
