@@ -10,10 +10,20 @@ from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 from frappe.utils import flt
 from frappe.utils import cint, cstr, getdate, nowdate
 
+
+####################################################
+
+@frappe.whitelist(allow_guest=True)
+def inv_update():
+	inv_data = frappe.local.request.get_json()
+	location_id = inv_data.get("location_id")
+	if location_id:
+		frappe.cache().set_value("location_id", location_id)
+	return location_id
+
 @frappe.whitelist(allow_guest=True)
 def receive_shopify_order():
 	order_data = frappe.local.request.get_json()
-	# print("shopifyorder",order_data)
 	if not order_data:
 		frappe.throw(_("No order data received."))
 
@@ -28,11 +38,15 @@ def receive_shopify_order():
 		if frappe.db.exists("Sales Order", {"shopify_id": order_number}):
 			return "Order already exists."
 
+		# Get location_id from order or fallback to cache
+		location_id = order_data.get("location_id") or frappe.cache().get_value("location_id")
+		warehouse = frappe.db.get_value("Warehouse", {"custom_shopify_id": location_id})
+		if not warehouse:
+			warehouse = settings.warehouse or f"Stores - {company_abbr}"
+
 		customer = order_data.get("customer", {})
-
 		customer_email = customer.get("email")
-		id = customer.get("id")
-
+		customer_id = customer.get("id")
 		customer_name = (customer.get("first_name") or "") + " " + (customer.get("last_name") or "")
 		customer_name = customer_name.strip() or "Guest"
 
@@ -40,12 +54,10 @@ def receive_shopify_order():
 		items = order_data.get("line_items", [])
 		tax_lines = order_data.get("tax_lines", [])
 		tax_total_amt = order_data.get("current_total_tax")
- 
 		shipping_lines = order_data.get("shipping_lines", [])
 
 		shipping_address = order_data.get("shipping_address") or {}
 		billing_address = order_data.get("billing_address") or {}
-
 
 		discount_info = order_data.get("discount_applications", [])
 		discount_percentage = sum(
@@ -57,12 +69,9 @@ def receive_shopify_order():
 			for d in discount_info if d.get("value_type") == "fixed_amount"
 		)
 
-
-		customer_docname = frappe.db.get_value("Customer", {"shopify_id": id})
+		customer_docname = frappe.db.get_value("Customer", {"shopify_id": customer_id})
 		if not customer_docname:
 			customer_docname = customer_creation()
-			print("ccccccccccccccccc")
-
 
 		sales_order = frappe.new_doc("Sales Order")
 		sales_order.customer = customer_name
@@ -74,40 +83,35 @@ def receive_shopify_order():
 		sales_order.additional_discount_percentage = discount_percentage
 		sales_order.discount_amount = discount_fixed
 
-
 		for item in items:
-
 			product_id = item.get("product_id")
 			item_code = frappe.db.get_value("Item", {"shopify_id": product_id})
 			if not item_code:
 				item_code = product_creation()
+
 			if item.get("tax_lines"):
 				for tax in item.get("tax_lines", []):
-					tax_rate = flt(tax.get("rate"))*100
-					print(tax_rate)
+					tax_rate = flt(tax.get("rate")) * 100
 					tax_account = frappe.db.get_value("Item Tax Template", {"gst_rate": tax_rate})
-					print("FFFFFFFFFFFFFFFFFFFFFFFFFFFFF", tax_account)
 					sales_order.append("items", {
 						"item_code": item_code,
 						"delivery_date": sales_order.delivery_date,
 						"uom": settings.uom or "Nos",
 						"qty": item.get("quantity", 1),
 						"rate": item.get("price", 0),
-						"warehouse": settings.warehouse or f"Stores - {company_abbr}",
+						"warehouse": warehouse,
 						"item_tax_template": tax_account,
-						"gst_treatment":"Taxable"
-						
+						"gst_treatment": "Taxable"
 					})
 			else:
 				sales_order.append("items", {
-						"item_code": item_code,
-						"delivery_date": sales_order.delivery_date,
-						"uom": settings.uom or "Nos",
-						"qty": item.get("quantity", 1),
-						"rate": item.get("price", 0),
-						"warehouse": settings.warehouse or f"Stores - {company_abbr}",                    
-					})
-
+					"item_code": item_code,
+					"delivery_date": sales_order.delivery_date,
+					"uom": settings.uom or "Nos",
+					"qty": item.get("quantity", 1),
+					"rate": item.get("price", 0),
+					"warehouse": warehouse
+				})
 
 		for line in shipping_lines:
 			price = float(line.get("price", 0))
@@ -118,45 +122,27 @@ def receive_shopify_order():
 					"uom": settings.uom or "Nos",
 					"qty": 1,
 					"rate": price,
-					"warehouse": settings.warehouse or f"Stores - {company_abbr}",
+					"warehouse": warehouse,
 				})
-
-
-		# for tax in tax_lines:
-
-		#     rate = (tax.get("rate") or 0) * 100
-		#     tax_amount = float(tax.get("price", 0))
-		#     sales_order.append("taxes", {
-		#         "charge_type": "Actual",
-		#         "account_head": "GST Expense - K",
-		#         "tax_amount": tax_total_amt,
-		#         "rate": rate
-				
-		#     })
 
 		sales_order.flags.ignore_permissions = True
 		sales_order.flags.ignore_mandatory = True
 		sales_order.insert()
-		
-		if order_data.get("financial_status")=="paid":
-			sales_order.submit() 
 
-
-		# sales_order.submit()
-		
+		if order_data.get("financial_status") == "paid":
+			sales_order.submit()
+			create_sales_invoice(sales_order)
 
 		frappe.msgprint(_("Sales Order created for order number: {0}").format(order_number))
-	
+
+		# Optional: clear the cached location
+		frappe.cache().delete_value("shopify_last_location_id")
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "Shopify Order Sync Error")
 		frappe.throw(_("Error while processing Shopify order: {0}").format(str(e)))
 
-	if True:
-	    if order_data.get("financial_status")=="paid":
-	        create_sales_invoice(sales_order)
-
-
+##########################################################################################3
 
 def create_sales_invoice(so):
 	cost_center = frappe.db.get_value("Cost Center",{"company":so.company},"name")
@@ -172,22 +158,11 @@ def create_sales_invoice(so):
 	si.insert(ignore_mandatory=True)
 	si.submit()
 
-	if si:
-		create_payment_entry(si)
+	# if si:
+	# 	create_payment_entry(si)
 
 
 def create_payment_entry(si):
-	# from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
-	# account= frappe.db.get_value("Mode of Payment Account",{"parent":"Cash","company":si.company},"default_account")
-	# payment_entry = get_payment_entry(si.doctype, si.name,bank_account=account)
-	# payment_entry.flags.ignore_mandatory = True
-	# payment_entry.reference_no = si.name
-	# payment_entry.posting_date = nowdate()
-	# payment_entry.reference_date = nowdate()
-	# payment_entry.insert(ignore_permissions=True)
-	# payment_entry.submit()
-	
-
 	invoice = frappe.get_doc("Sales Invoice",si.name)
 	cost_center = frappe.db.get_value("Cost Center",{"company":si.company},"name")
 	paid_from = frappe.db.get_all("Account", filters={"account_type": "Receivable", "company": si.company}, fields=["name","account_currency"])
@@ -202,6 +177,7 @@ def create_payment_entry(si):
 	pe.mode_of_payment ="Cash"
 	pe.paid_to = paid_to[0].name
 	pe.paid_from_account_currency = paid_from[0].account_currency
+	pe.reference_date =nowdate()
 	pe.paid_to_account_currency= paid_to[0].account_currency
 	pe.paid_amount = invoice.rounded_total
 	pe.received_amount = invoice.rounded_total
@@ -213,97 +189,9 @@ def create_payment_entry(si):
 	})
 	pe.flags.ignore_permissions = True
 	pe.flags.ignore_mandatory=True
-	pe.insert(ignore_permissions= True)
+	# pe.insert(ignore_permissions= True)
+	pe.save()
 	pe.submit()
-
-
-# def create_invoice(order=None,sal_order = None,company_abbr=None,settings=None):
-	
-#     sales_order = frappe.get_doc("Sales Order", sal_order)
-#     sales_order.submit()
-
-#     # invoice = frappe.new_doc("Sales Invoice")
-#     # invoice.customer = sales_order.customer
-#     # invoice.company = sales_order.company
-#     # invoice.set_posting_time = 1
-#     # invoice.set_is_pos = 0
-#     # invoice.set_is_return = 0
-#     # invoice.set_is_recurring = 0
-#     # invoice.set_is_opening = 0
-#     # invoice.set_is_internal_customer = 0
-#     # invoice.set_is_advance = 0
-#     # invoice.set_is_fixed_asset = 0
-#     # invoice.set_is_deferred_income = 0
-
-#     # for item in sales_order.items:
-#     #     invoice.append("items", {
-#     #         "item_code": item.item_code,
-#     #         "qty": item.qty,
-#     #         "rate": item.rate,
-#     #         "uom": item.uom,
-#     #         "warehouse": item.warehouse,
-#     #         "conversion_factor": item.conversion_factor,
-#     #         "item_tax_template": item.item_tax_template,
-#     #         "gst_treatment":"Taxable"
-#     #     })
-
-#     # # Set other fields as needed
-#     # if order_data.get("financial_status") == "paid":
-#     #     sales_order.submit()
-
-#     sal_inv= frappe.new_doc("Sales Invoice")
-#     sal_inv.company = settings.company
-#     sal_inv.customer = sales_order.customer
-#     sal_inv.update_stock == 1
-#     sal_inv.debit_to = f"Debtors - {company_abbr}"
-#     for row in sales_order.items:
-#         sal_inv.append("items", {
-#                 "item_code": row.item_code,
-#                 "delivery_date": row.delivery_date,
-#                 "uom": row.uom,
-#                 "qty": row.qty,
-#                 "rate": row.rate,
-#                 "warehouse": row.warehouse,
-#                 "item_tax_template":row.item_tax_template or "",
-# #  
-#                 "gst_treatment":row.gst_treatment or "" 
-#             })
-		
-#     sal_inv.flags.ignore_permissions = True
-#     sal_inv.flags.ignore_mandatory = True
-	
-#     sal_inv.insert()
-#     # sal_inv.save()
-#     sal_inv.submit()
-
-	# if sal_inv:
-	#     pay_entry = frappe.new_doc("Payment Entry")
-	#     pay_entry.party_type = "Customer"
-	#     pay_entry.posting_date = nowdate()
-	#     pay_entry.payment_type = "Receive"
-	#     pay_entry.mode_of_payment = "Cash"
-	#     pay_entry.party = sal_inv.customer
-	#     pay_entry.paid_amount = sal_inv.rounded_total
-	#     pay_entry.received_amount = sal_inv.rounded_total
-	#     pay_entry.paid_from = sal_inv.debit_to
-	#     pay_entry.cost_center = frappe.db.get_value("Company", settings.company, "cost_center") or f"Main - {company_abbr}"
-	#     pay_entry.append("references", {
-	#         "reference_doctype": "Sales Invoice",
-	#         "reference_name": sal_inv.name,
-	#         "total_amount": sal_inv.rounded_total,
-	#         "allocated_amount": sal_inv.rounded_total
-	#     })
-
-	#     pay_entry.flags.ignore_permissions = True
-	#     pay_entry.flags.ignore_mandatory = True
-	#     pay_entry.insert()
-	#     pay_entry.save()
-	#     pay_entry.submit()
-	# invoice.submit()
-
-
-
-
 
 ###############################################################################################################################
 
@@ -568,12 +456,15 @@ def customer_creation():
 @frappe.whitelist(allow_guest=True)
 def product_creation():
 	shopify_keys = frappe.get_single("Shopify Connector Setting")
+	# headers = dict(frappe.local.request.headers)
+	# print(f"Headerrs ::::::::::::::::::: {headers}")
 	if shopify_keys.sync_product:
 		order_data = frappe.local.request.get_json()
 		print("\n\n\norder_data",order_data)
 		product_id = order_data.get("id")
 		for v in order_data.get("variants", []):
 			inventory_item_id = v.get("inventory_item_id")
+			print("\n\n\n\n\n",inventory_item_id)
 
 		sys_lang = frappe.get_single("System Settings").language or "en"
 		settings = frappe.get_doc("Shopify Connector Setting")
@@ -720,44 +611,6 @@ def product_creation():
 
 		return "Product created with variants and HSN."
 	
-
-def get_inv_level():
-	shopify_keys = frappe.get_single("Shopify Connector Setting")
-	SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
-	SHOPIFY_STORE_URL = shopify_keys.shop_url
-	SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
-
-	shopify_location_ids = frappe.get_all(
-		"Warehouse",
-		filters={"custom_shopify_id": ["!=", ""]},
-		fields=["custom_shopify_id"]
-	)
-	print(shopify_location_ids)
-
-	headers = {
-		'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
-	}
-
-	location_ids = [loc["custom_shopify_id"] for loc in shopify_location_ids]
-
-	params = {
-		'location_ids': ','.join(location_ids),
-	}
-
-	response = requests.get(
-		f'https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/inventory_levels.json',
-		params=params,
-		headers=headers,
-	)
-	print(response)
-
-	if response.status_code != 200:
-		frappe.log_error(response.text, "Shopify Inventory Fetch Failed")
-
-	print(response.json())
-
-	
-
    
 @frappe.whitelist(allow_guest=True)
 def get_hsn_from_shopify(inventory_item_id, settings):
@@ -958,7 +811,7 @@ def order_update():
 		"sales_order": sales_order.name
 	}
 
-
+########################################################################
 
 @frappe.whitelist(allow_guest = True)
 def get_shopify_location():
@@ -996,6 +849,45 @@ def get_shopify_location():
 		warehouse.flags.ignore_permissions = True
 		warehouse.save()
 
+################################################################################
+
+#* Stock entry created for respective product
+
+@frappe.whitelist(allow_guest = True)
+def get_inv_level():
+	inv_level = frappe.local.request.get_json()
+	print("\n\n\ninv_level",inv_level)
+
+	if inv_level.get("available") != 0:
+		item = frappe.db.get_value("Item",{"custom_inventory_item_id":inv_level.get("inventory_item_id")},"name")
+		print(f"\n\n\nitem {item}")
+		item_doc = frappe.get_doc("Item",item)
+		print(f"\n\n\nitem doc {item_doc}")
+		
+		warehouse = frappe.db.get_value("Warehouse",{"custom_shopify_id":inv_level.get("location_id")},"name")
+		print(f"\n\n\nwarehouse {warehouse}")
+		se = frappe.new_doc("Stock Entry")
+		se.stock_entry_type = "Material Receipt"
+		se.append("items",{
+			"t_warehouse":warehouse,
+			"item_code":item_doc.name,
+			"uom":"Nos",
+			"qty":inv_level.get("available"),
+			"basic_rate":item_doc.shopify_selling_rate
+			
+		})
+		se.flags.ignore_mandatory=True
+		se.flags.ignore_permissions = True
+		se.insert()
+		se.submit()
+
+# @frappe.whitelist(allow_guest = True)
+# def inv_update():
+# 	inv_data = frappe.local.request.get_json()
+# 	print(f"\n\n\n\n inv_data {inv_data}\n\n\n")
+# 	location_id = inv_data.get("location_id")
+# 	print("\n\n\n\nlocation_id",location_id)
+# 	return {"location_id":location_id}
 
 
 
@@ -1011,10 +903,7 @@ def get_shopify_location():
 
 
 
-
-
-
-
+###################################################################################
 		
 
 # @frappe.whitelist(allow_guest=True)
@@ -1332,3 +1221,6 @@ def get_shopify_location():
 #     frappe.flags.from_shopify = False
 #     frappe.db.commit()
 #     return {"status": "success", "message": "Product and variants updated successfully"}
+
+
+###########################################

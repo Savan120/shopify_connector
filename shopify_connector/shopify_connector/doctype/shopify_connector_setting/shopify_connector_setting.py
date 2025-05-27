@@ -33,7 +33,7 @@ class ShopifyConnectorSetting(Document):
             create_delete_custom_fields(self)
             get_inv_level()
             # get_order(self) 
-
+            # get_inventory_levels_for_all_items()
    
 
 def setup_custom_fields():
@@ -615,6 +615,7 @@ def get_inv_level():
     headers = {
         'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
     }
+    
 
     location_ids = [loc["custom_shopify_id"] for loc in shopify_location_ids]
 
@@ -637,14 +638,6 @@ def get_inv_level():
     
 
     return response.json()
+###################################################
 
 
-
-@frappe.whitelist(allow_guest=True,methods=["POST"])
-def shopify_webhook():
-    data = frappe.request.get_data(as_text=True)
-    frappe.logger("shopify").info(f"Shopify Webhook Received: {data}")
-
-    return {"message": "Shopify request received"}, 200
-    
-    
