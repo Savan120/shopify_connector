@@ -22,6 +22,7 @@
   "warehouse",
   "tax_account",
   "f_n_f_account",
+  "shopify_webhook_secret",
   "erpnext_to_shopify_section",
   "sync_customer",
   "sync_product",
@@ -157,12 +158,17 @@
    "fieldname": "sync_location",
    "fieldtype": "Check",
    "label": "Sync Location"
+  },
+  {
+   "fieldname": "shopify_webhook_secret",
+   "fieldtype": "Data",
+   "label": "Shopify Webhook Secret Key"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-05-21 16:31:19.918638",
+ "modified": "2025-05-27 15:25:56.210082",
  "modified_by": "Administrator",
  "module": "Shopify Connector",
  "name": "Shopify Connector Setting",
