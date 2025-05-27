@@ -32,7 +32,7 @@ class ShopifyConnectorSetting(Document):
             setup_custom_fields()
             create_delete_custom_fields(self)
             get_inv_level()
-            # get_order(self) 
+            get_order(self) 
             # get_inventory_levels_for_all_items()
    
 
@@ -391,7 +391,8 @@ def get_order(self):
             date_created = date_created[0]
 
             if not customer_name:
-                frappe.throw(_(f"Not Customer Available in Shopify Order !! Please check the order id {order_id}"))
+                print(_(f"Not Customer Available in Shopify Order !! Please check the order id {order_id}"))
+                continue
             else:
                 link_customer_and_address( raw_shipping_data, customer_name, contact_email)
                 # link_items(items_list, sys_lang, shopify_connector_setting, shipping_lines, img_link)

@@ -6,19 +6,17 @@ import frappe
 @frappe.whitelist()
 def get_synced_orders():
     try:
-        # Query the database for synced orders
-        synced_orders = frappe.get_all("Sales Order", filters={"status": "To Deliver and Bill", "shopify_id": ("!=", "")}, fields=["shopify_id", "customer"])
+        synced_orders = frappe.get_all("Sales Order", filters={"status": "To Deliver and Bill", "shopify_id": ("!=", "")}, fields=["shopify_id", "customer", "name"])
         print("::::::::::synced_orders:::::::::::::", synced_orders)
 
-        # Get the total count of synced orders
         total_count = len(synced_orders)
 
-        # Format the data as a list of dictionaries
         orders_data = []
         for order in synced_orders:
             orders_data.append({
                 "shopify_id": order.shopify_id,
                 "customer": order.customer,
+                "name": order.name,
             })
 
         # Return the orders data along with the total count
