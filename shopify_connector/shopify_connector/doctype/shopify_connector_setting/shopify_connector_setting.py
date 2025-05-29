@@ -640,6 +640,7 @@ def product_creation():
         frappe.throw(f"Failed to fetch product data: {response.text}")
 
     data = response.json()
+    print(f"\n\n\n\n\n{data}\n\n\n")
 
     for order_data in data.get("products", []):
         product_id = order_data.get("id")
@@ -744,7 +745,7 @@ def product_creation():
                 variant.custom_variant_id = v.get("id")
                 variant.custom_inventory_item_id = v.get("inventory_item_id")
 
-                variant_options = [v.get("optio n1"), v.get("option2"), v.get("option3")]
+                variant_options = [v.get("option1"), v.get("option2"), v.get("option3")]
 
                 for opt_value in variant_options:
                     if not opt_value:
