@@ -128,6 +128,7 @@ shopify.SyncedProductViewer = class {
 
         if (syncedProducts && syncedProducts.length > 0) {
             syncedProducts.forEach(product => {
+                console.log(product)
                 const row = `<tr><td><a href="/app/item/${(product.item_name || '')}">${product.item_name || 'N/A'}</a></td><td>${product.shopify_id || 'N/A'}</td><td>${product.item_group || 'N/A'}</td></tr>`;
                 tbody.append(row);
             });

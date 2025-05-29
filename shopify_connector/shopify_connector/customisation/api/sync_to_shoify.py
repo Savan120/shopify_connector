@@ -672,7 +672,7 @@ def send_item_to_shopify(doc, method):
                 sku = variant.get("sku")
                 variant_id = variant.get("id")
                 inventory_item_id = variant.get("inventory_item_id")
-                if sku and variant_id:
+                if variant_id:
                     try:
                         frappe.db.set_value("Item", {"item": item.name}, {
                             "shopify_variant_id": variant_id,
@@ -779,6 +779,12 @@ def create_shopify_location(doc, method):
     
     if getattr(doc.flags, "from_shopify", False):
         return
+    
+    shopify = frappe.get_single("Shopify Connector Setting")
+
+    if shopify.enable_shopify == False:
+        return
+    
     address = f"{doc.address_line_1} {doc.address_line_2 or ''}"
     country = "India"
     # city = doc.city or " "
