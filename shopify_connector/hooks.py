@@ -137,9 +137,9 @@ doc_events = {
         "before_validate": "shopify_connector.shopify_connector.customisation.sales_order.sales_order.before_validate"
     },
     "Warehouse":{
-        "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_location",
         "on_update":[ "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.activate_deactivate_shopify_location",
-                     "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.update_shopify_location"],
+                     "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.update_shopify_location",
+                     "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_location"],
         "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_shopify_location",
         
     }

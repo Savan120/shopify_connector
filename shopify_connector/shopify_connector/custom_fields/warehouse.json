@@ -2,12 +2,11 @@
  "Warehouse": [
   {
    "dt": "Warehouse",
-   "fieldname": "custom_country",
-   "fieldtype": "Link",
-   "insert_after": "mobile_no",
-   "label": "Country",
-   "module": "Shopify Connector",
-   "options": "Country"
+   "fieldname": "custom_send_to_shopify",
+   "fieldtype": "Check",
+   "insert_after": "disabled",
+   "label": "Send to Shopify",
+   "module": "Shopify Connector"
   },
   {
    "dt": "Warehouse",
@@ -18,6 +17,16 @@
    "label": "Shopify ID",
    "module": "Shopify Connector",
    "read_only": 1
+  },
+  {
+   "dt": "Warehouse",
+   "fieldname": "custom_country",
+   "fieldtype": "Link",
+   "insert_after": "mobile_no",
+   "is_system_generated": 1,
+   "label": "Country",
+   "module": "Shopify Connector",
+   "options": "Country"
   }
  ]
 }

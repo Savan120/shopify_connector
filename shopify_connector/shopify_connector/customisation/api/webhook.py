@@ -114,8 +114,12 @@ def receive_shopify_order():
 		sales_order.discount_amount = discount_fixed
 
 		for item in items:
-			product_id = item.get("product_id")
-			item_code = frappe.db.get_value("Item", {"shopify_id": product_id})
+			if item.get("product_id") and item.get("variant_id") and item.get("variant_title"):
+				variant_id = item.get("variant_id")
+				item_code = frappe.db.get_value("Item", {"custom_variant_id": variant_id})
+			else:
+				product_id = item.get("product_id")
+				item_code = frappe.db.get_value("Item", {"shopify_id": product_id})
 			if not item_code:
 				item_code = product_creation()
 			if item.get("tax_lines"):
@@ -135,8 +139,8 @@ def receive_shopify_order():
 							"rate": item.get("price", 0),
 							"warehouse": warehouse
 							or f"Stores - {company_abbr}",
-							"item_tax_template": tax_account,
-							"gst_treatment": "Taxable",
+							# "item_tax_template": tax_account,
+							# "gst_treatment": "Taxable",
 						},
 					)
 			else:
@@ -167,17 +171,15 @@ def receive_shopify_order():
 					},
 				)
 
-		# for tax in tax_lines:
+		for tax in tax_lines:
+			rate = (tax.get("rate") or 0) * 100
+			# tax_amount = float(tax.get("price", 0))
+			sales_order.append("taxes", {
+				"charge_type": "On Net Total",
+				"account_head": settings.tax_account,
+				"rate": rate
 
-		#     rate = (tax.get("rate") or 0) * 100
-		#     tax_amount = float(tax.get("price", 0))
-		#     sales_order.append("taxes", {
-		#         "charge_type": "Actual",
-		#         "account_head": "GST Expense - K",
-		#         "tax_amount": tax_total_amt,
-		#         "rate": rate
-
-		#     })
+			})
 
 		sales_order.flags.ignore_permissions = True
 		sales_order.flags.ignore_mandatory = True
@@ -215,8 +217,9 @@ def create_sales_invoice(so):
 	si.insert(ignore_mandatory=True)
 	si.submit()
 
-	# if si:
-	#     create_payment_entry(si)
+	if si:
+		frappe.session.user="Administrator"
+		create_payment_entry(si)
 
 
 def create_payment_entry(si):
@@ -229,7 +232,7 @@ def create_payment_entry(si):
 	# payment_entry.reference_date = nowdate()
 	# payment_entry.insert(ignore_permissions=True)
 	# payment_entry.submit()
-
+	setting = frappe.get_single("Shopify Connector Setting")
 	invoice = frappe.get_doc("Sales Invoice", si.name)
 	cost_center = frappe.db.get_value("Cost Center", {"company": si.company}, "name")
 	paid_from = frappe.db.get_all(
@@ -250,7 +253,7 @@ def create_payment_entry(si):
 	pe.posting_date = nowdate()
 	pe.paid_from = paid_from[0].name
 	pe.mode_of_payment = "Cash"
-	pe.paid_to = paid_to[0].name
+	pe.paid_to = paid_to[1].name
 	pe.paid_from_account_currency = paid_from[0].account_currency
 	pe.paid_to_account_currency = paid_to[0].account_currency
 	pe.paid_amount = invoice.rounded_total
@@ -568,8 +571,8 @@ def product_creation():
 		if item.has_variants:
 			for v in order_data.get("variants", []):
 				variant = frappe.new_doc("Item")
-				variant.item_code = v.get("title")
-				variant.item_name = v.get("title")
+				variant.item_code = order_data.get("title") +"-"+ v.get("title")
+				variant.item_name = order_data.get("title") +"-"+ v.get("title")
 				variant.item_group = _("Shopify Products", sys_lang)
 				variant.variant_of = item.name
 				variant.stock_uom = item.stock_uom
@@ -1023,36 +1026,42 @@ def order_update():
 
 @frappe.whitelist(allow_guest=True)
 def get_shopify_location():
-	shopify_keys = frappe.get_single("Shopify Connector Setting")
-	shopify_webhook_secret = shopify_keys.shopify_webhook_secret
-
+	raw_request_body = frappe.local.request.get_data()
+	shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
 	try:
-		request_body = frappe.local.request.get_data()
-	except Exception as e:
-		frappe.log_error(f"Failed to get request data: {e}", "Shopify Webhook Error")
-		frappe.throw("Invalid request data.")
+		settings_for_secret = frappe.get_single("Shopify Connector Setting")
+		shopify_webhook_secret = settings_for_secret.shopify_webhook_secret
 
-	shopify_hmac = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+		if not shopify_webhook_secret:
+			frappe.throw(
+				_(
+					"Webhook secret not configured. Please set it up in Shopify Connector Setting."
+				),
+				frappe.ValidationError,
+			)
 
-	# print("\n\n\n\n>>>>>>>>>>>>>.",shopify_hmac, "\n\n\n\n>>>>>>>>",shopify_webhook_secret.encode('utf-8'))
+		secret_key_bytes = shopify_webhook_secret.encode("utf-8")
 
-	if not shopify_hmac:
-		frappe.throw("Unauthorized: Webhook signature missing.")
-
-	calculated_hmac = base64.b64encode(
-		hmac.new(
-			shopify_webhook_secret.encode("utf-8"), request_body, hashlib.sha256
-		).digest()
-	)
-	# print(calculated_hmac)
-	if not hmac.compare_digest(calculated_hmac, shopify_hmac.encode("utf-8")):
-		frappe.log_error(
-			f"Webhook signature mismatch. Calculated: {calculated_hmac.decode('utf-8')}, Received: {shopify_hmac}",
-			"Shopify Webhook Error",
+		calculated_hmac = base64.b64encode(
+			hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
 		)
-		frappe.throw("Unauthorized: Invalid webhook signature.")
-	if shopify_keys.sync_location:
-		response = frappe.local.request.get_json()
+		if not hmac.compare_digest(
+			calculated_hmac, shopify_hmac_header.encode("utf-8")
+		):
+			frappe.throw(
+				_("Unauthorized: Invalid webhook signature."), frappe.PermissionError
+			)
+
+	except Exception as e:
+		frappe.log_error(
+			frappe.get_traceback(), "Shopify Webhook Unexpected Verification Error"
+		)
+		frappe.throw(
+			_(f"An unexpected error occurred during webhook verification: {e}")
+		)
+
+	response = json.loads(raw_request_body.decode("utf-8"))
+	if settings_for_secret.sync_location:
 		print("\n\n\n\nresponse", response)
 
 		if not response:
@@ -1130,10 +1139,87 @@ def order_payment_update():
 		sales_order = frappe.db.get_value("Sales Order", {"shopify_id": order_payment.get("order_number")},"name")
 		sal_order = frappe.get_doc("Sales Order",sales_order)
 		sal_order.flags.ignore_permissions = True 
+		sal_order.flags.ignore_mandatory = True
 		sal_order.submit()
 		create_sales_invoice(sal_order)
 
 
+#######################################################################################
+
+@frappe.whitelist(allow_guest=True)
+def update_shopify_location():
+	raw_request_body = frappe.local.request.get_data()
+	shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+	try:
+		settings_for_secret = frappe.get_single("Shopify Connector Setting")
+		shopify_webhook_secret = settings_for_secret.shopify_webhook_secret
+
+		if not shopify_webhook_secret:
+			frappe.throw(
+				_(
+					"Webhook secret not configured. Please set it up in Shopify Connector Setting."
+				),
+				frappe.ValidationError,
+			)
+
+		secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+
+		calculated_hmac = base64.b64encode(
+			hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
+		)
+		if not hmac.compare_digest(
+			calculated_hmac, shopify_hmac_header.encode("utf-8")
+		):
+			frappe.throw(
+				_("Unauthorized: Invalid webhook signature."), frappe.PermissionError
+			)
+
+	except Exception as e:
+		frappe.log_error(
+			frappe.get_traceback(), "Shopify Webhook Unexpected Verification Error"
+		)
+		frappe.throw(
+			_(f"An unexpected error occurred during webhook verification: {e}")
+		)
+
+	response = json.loads(raw_request_body.decode("utf-8"))
+	print(f"\n\n\n\n\nresponse{response}\n\n\n\n\n\n\n")
+
+	if settings_for_secret.sync_location:
+		print("\n\n\n\nresponse", response)
+
+		if not response:
+			frappe.log_error("No locations found.")
+			return
+
+		disabled = not response.get("active", True)
+		shopify_id = response.get("id")
+		warehouse_name = response.get("name")
+
+		warehouse_existing = frappe.db.get_value(
+			"Warehouse", {"custom_shopify_id": shopify_id}, "name"
+		)
+		if warehouse_existing:
+			warehouse = frappe.get_doc("Warehouse", warehouse_existing)
+		else:
+			frappe.throw("No such Warehouse Exists")
+
+		warehouse.warehouse_name = warehouse_name
+		warehouse.address_line_1 = response.get("address1")
+		warehouse.address_line_2 = response.get("address2")
+		warehouse.city = response.get("city")
+		warehouse.state = response.get("province")
+		warehouse.custom_country = response.get("country_name")
+		warehouse.pin = response.get("zip")
+		warehouse.phone_no = response.get("phone")
+		warehouse.custom_shopify_id = shopify_id
+		warehouse.disabled = disabled
+		warehouse.flags.ignore_shopify_sync = True
+		warehouse.flags.ignore_permissions = True
+		warehouse.save()
+
+
+################################################################################
 
 # @frappe.whitelist(allow_guest=True)
 # def product_update():

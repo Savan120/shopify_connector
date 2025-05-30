@@ -33,8 +33,8 @@ class ShopifyConnectorSetting(Document):
         if self.enable_shopify:
             product_creation()
             customer_creation()
-            get_order(self) 
-            # get_shopify_location()
+            get_order() 
+            get_shopify_location()
             # sync_shopify_products_to_erpnext()
             setup_custom_fields()
             create_delete_custom_fields(self)
@@ -346,7 +346,7 @@ def get_shopify_location():
 #     else:
 #         frappe.throw(_("Shopify Order is not available !!"))
 
-def get_order(self):
+def get_order():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
@@ -455,8 +455,8 @@ def get_order(self):
                                 "rate": item.get("price", 0),
                                 "warehouse": warehouse
                                 or f"Stores - {company_abbr}",
-                                "item_tax_template": tax_account,
-                                "gst_treatment": "Taxable",
+                                # "item_tax_template": tax_account,
+                                # "gst_treatment": "Taxable",
                             },
                         )
                 else:
@@ -487,15 +487,14 @@ def get_order(self):
                         },
                     )
 
-            # for tax in tax_lines:
-            #     rate = (tax.get("rate") or 0) * 100
-            #     tax_amount = float(tax.get("price", 0))
-            #     sales_order.append("taxes", {
-            #         "charge_type": "Actual",
-            #         "account_head": "Output Tax IGST - S",
-            #         "tax_amount": tax_total_amt,
-            #         "rate": rate
-            #     })
+            for tax in tax_lines:
+                rate = (tax.get("rate") or 0) * 100
+                tax_amount = float(tax.get("price", 0))
+                sales_order.append("taxes", {
+                    "charge_type": "On Net Total",
+                    "account_head": settings.tax_account,
+                    "rate": rate
+                })
 
             sales_order.flags.ignore_permissions = True
             sales_order.flags.ignore_mandatory = True

@@ -12,112 +12,113 @@ def send_customer_to_shopify_hook_delayed(doc):
     send_customer_to_shopify_hook(doc, "after_insert") 
 
 def send_customer_to_shopify_hook(doc, method):
-    if getattr(doc.flags, "from_shopify", False):
-         return
+    if doc.custom_send_to_shopify:
+        if getattr(doc.flags, "from_shopify", False):
+            return
 
-    shopify_keys = frappe.get_single("Shopify Connector Setting")
-    SHOPIFY_API_KEY = shopify_keys.api_key
-    SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
-    SHOPIFY_STORE_URL = shopify_keys.shop_url
-    SHOPIFY_API_VERSION = "2024-01"
+        shopify_keys = frappe.get_single("Shopify Connector Setting")
+        SHOPIFY_API_KEY = shopify_keys.api_key
+        SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
+        SHOPIFY_STORE_URL = shopify_keys.shop_url
+        SHOPIFY_API_VERSION = "2024-01"
 
-    if shopify_keys.sync_customer:
+        if shopify_keys.sync_customer:
 
-        email = ""
-        phone = ""
-
-
-        address_links = frappe.get_all("Dynamic Link", filters={
-            "link_doctype": "Customer",
-            "link_name": doc.name,
-            "parenttype": "Address"
-        }, fields=["parent"])
+            email = ""
+            phone = ""
 
 
-        if not address_links and doc.customer_name != doc.name:
             address_links = frappe.get_all("Dynamic Link", filters={
                 "link_doctype": "Customer",
-                "link_name": doc.customer_name,
+                "link_name": doc.name,
                 "parenttype": "Address"
             }, fields=["parent"])
 
-        address_list = []
 
-        if address_links:
-            primary_address = frappe.get_doc("Address", address_links[0]["parent"])
-            print("if",primary_address)
-            email = primary_address.email_id or ""
-            phone = primary_address.phone or ""
+            if not address_links and doc.customer_name != doc.name:
+                address_links = frappe.get_all("Dynamic Link", filters={
+                    "link_doctype": "Customer",
+                    "link_name": doc.customer_name,
+                    "parenttype": "Address"
+                }, fields=["parent"])
 
-            for link in address_links:
-                address = frappe.get_doc("Address", link["parent"])
+            address_list = []
+
+            if address_links:
+                primary_address = frappe.get_doc("Address", address_links[0]["parent"])
+                print("if",primary_address)
+                email = primary_address.email_id or ""
+                phone = primary_address.phone or ""
+
+                for link in address_links:
+                    address = frappe.get_doc("Address", link["parent"])
+                    address_list.append({
+                        "address1": address.address_line1,
+                        "address2": address.address_line2 or "",
+                        "city": address.city,
+                        "province": address.state,
+                        "country": address.country,
+                        "zip": address.pincode,
+                        "phone": address.phone,
+                        "email": address.email_id
+                    })
+            elif doc.get("customer_primary_address"):
+                primary_address = frappe.get_doc("Address", doc.customer_primary_address)
+                print("elif",primary_address)
+                email = primary_address.email_id or ""
+                phone = primary_address.phone or ""
                 address_list.append({
-                    "address1": address.address_line1,
-                    "address2": address.address_line2 or "",
-                    "city": address.city,
-                    "province": address.state,
-                    "country": address.country,
-                    "zip": address.pincode,
-                    "phone": address.phone,
-                    "email": address.email_id
+                    "address1": primary_address.address_line1,
+                    "address2": primary_address.address_line2 or "",
+                    "city": primary_address.city,
+                    "province": primary_address.state or primary_address.custom_state,
+                    "country": primary_address.country,
+                    "zip": primary_address.pincode,
+                    "phone": primary_address.phone,
+                    "email": primary_address.email_id
                 })
-        elif doc.get("customer_primary_address"):
-            primary_address = frappe.get_doc("Address", doc.customer_primary_address)
-            print("elif",primary_address)
-            email = primary_address.email_id or ""
-            phone = primary_address.phone or ""
-            address_list.append({
-                "address1": primary_address.address_line1,
-                "address2": primary_address.address_line2 or "",
-                "city": primary_address.city,
-                "province": primary_address.state or primary_address.custom_state,
-                "country": primary_address.country,
-                "zip": primary_address.pincode,
-                "phone": primary_address.phone,
-                "email": primary_address.email_id
-            })
-        
-        if phone == "":
-            phone = doc.mobile_no
-        
-        if email == "":
-            email = doc.email_id
+            
+            if phone == "":
+                phone = doc.mobile_no
+            
+            if email == "":
+                email = doc.email_id
 
 
-        customer_payload = {
-            "customer": {
-                "first_name": doc.customer_name or "",
-                "email": email,
-                "phone": phone,
-                "addresses": address_list,
-                "tags":doc.customer_group or ""
+            customer_payload = {
+                "customer": {
+                    "first_name": doc.customer_name or "",
+                    "email": email,
+                    "phone": phone,
+                    "addresses": address_list,
+                    "tags":doc.customer_group or ""
+                }
             }
-        }
 
-        try:
-            shopify_customer_id = doc.shopify_id or frappe.db.get_value("Customer", doc.name, "shopify_id")
+            try:
+                shopify_customer_id = doc.shopify_id or frappe.db.get_value("Customer", doc.name, "shopify_id")
 
-            if shopify_customer_id:
-                customer_payload["customer"]["id"] = shopify_customer_id
-                url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}.json"
-                response = requests.put(url, json=customer_payload, verify=False)
-                print(response.text)
-            else:
-                url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers.json"
-                response = requests.post(url, json=customer_payload, verify=False)
-        
+                if shopify_customer_id:
+                    customer_payload["customer"]["id"] = shopify_customer_id
+                    url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}.json"
+                    response = requests.put(url, json=customer_payload, verify=False)
+                    print(response.text)
+                else:
+                    url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers.json"
+                    response = requests.post(url, json=customer_payload, verify=False)
+            
 
-            if response.status_code not in (200, 201):
-                frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
-            else:
-                shopify_id = response.json()["customer"]["id"]
-                shopify_email = response.json()["customer"]["email"]
-                doc.flags.from_shopify = True
-                doc.db_set("shopify_id",shopify_id)
-                # doc.db_set("shopify_email",shopify_email)
+                if response.status_code not in (200, 201):
+                    frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
+                else:
+                    shopify_id = response.json()["customer"]["id"]
+                    shopify_email = response.json()["customer"]["email"]
+                    doc.flags.from_shopify = True
+                    doc.db_set("shopify_id",shopify_id)
+                    # doc.db_set("shopify_email",shopify_email)
 
-        except Exception as e:
-            frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
+            except Exception as e:
+                frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
 
 
 
@@ -635,59 +636,59 @@ def send_item_to_shopify(doc, method):
                     "values": list(option_map[attr])
                 })
 
-
-    if item.variant_of:
-        url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{variant_parent_shopify_id}.json"
-        response = requests.put(url, json=product_payload, verify=False)
-        doc.flags.from_shopify = True
-        print("if")
-        print(response.text)
-    elif item.shopify_id:
-        url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{item.shopify_id}.json"
-        response = requests.put(url, json=product_payload, verify=False)
-        print("elif")
-
-        shopify_product = response.json()
-        for variant in shopify_product.get("variants", []):
-            sku = variant.get("sku")
-            variant_id = variant.get("id")
-            inventory_item_id = variant.get("inventory_item_id")
-            frappe.db.set_value("Item", item.name, {
-                "custom_inventory_item_id": inventory_item_id,
-            })
-            print("/////")
-            update_shopify_hsn_code(item.gst_hsn_code, inventory_item_id)
+    if doc.custom_send_to_shopify:
+        if item.variant_of:
+            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{variant_parent_shopify_id}.json"
+            response = requests.put(url, json=product_payload, verify=False)
             doc.flags.from_shopify = True
-    else:
-        url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
-        response = requests.post(url, json=product_payload, verify=False)
-        print("\n\nresponse",response)
-        print("else last")
-        if response.status_code == 201:
-            shopify_product = response.json()["product"]
-            frappe.db.set_value("Item", item.name, "shopify_id", shopify_product["id"])
-            item.shopify_id = shopify_product["id"]
+            print("if")
+            print(response.text)
+        elif item.shopify_id:
+            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{item.shopify_id}.json"
+            response = requests.put(url, json=product_payload, verify=False)
+            print("elif")
 
+            shopify_product = response.json()
             for variant in shopify_product.get("variants", []):
                 sku = variant.get("sku")
                 variant_id = variant.get("id")
                 inventory_item_id = variant.get("inventory_item_id")
-                if variant_id:
-                    try:
-                        frappe.db.set_value("Item", {"item": item.name}, {
-                            "shopify_variant_id": variant_id,
-                            "custom_inventory_item_id": inventory_item_id
-                        })
-                        print("/////")
-                        update_shopify_hsn_code(item.gst_hsn_code, inventory_item_id)
-                        doc.flags.from_shopify = True
-                    except Exception as e:
-                        frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku}: {str(e)}", "Shopify Sync")
-                        doc.flags.from_shopify = True
+                frappe.db.set_value("Item", item.name, {
+                    "custom_inventory_item_id": inventory_item_id,
+                })
+                print("/////")
+                update_shopify_hsn_code(item.gst_hsn_code, inventory_item_id)
+                doc.flags.from_shopify = True
+        else:
+            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
+            response = requests.post(url, json=product_payload, verify=False)
+            print("\n\nresponse",response)
+            print("else last")
+            if response.status_code == 201:
+                shopify_product = response.json()["product"]
+                frappe.db.set_value("Item", item.name, "shopify_id", shopify_product["id"])
+                item.shopify_id = shopify_product["id"]
 
-        if response.status_code not in (200, 201):
-            frappe.log_error(f"Shopify product/variant sync failed: {response.text}", "Shopify Sync Error")
-            return
+                for variant in shopify_product.get("variants", []):
+                    sku = variant.get("sku")
+                    variant_id = variant.get("id")
+                    inventory_item_id = variant.get("inventory_item_id")
+                    if variant_id:
+                        try:
+                            frappe.db.set_value("Item", {"item": item.name}, {
+                                "shopify_variant_id": variant_id,
+                                "custom_inventory_item_id": inventory_item_id
+                            })
+                            print("/////")
+                            update_shopify_hsn_code(item.gst_hsn_code, inventory_item_id)
+                            doc.flags.from_shopify = True
+                        except Exception as e:
+                            frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku}: {str(e)}", "Shopify Sync")
+                            doc.flags.from_shopify = True
+
+            if response.status_code not in (200, 201):
+                frappe.log_error(f"Shopify product/variant sync failed: {response.text}", "Shopify Sync Error")
+                return
 
 
 
@@ -774,86 +775,87 @@ def shopify_credentials():
 
 
 def create_shopify_location(doc, method):
-    if doc.flags.ignore_shopify_sync:
-        return
-    
-    if getattr(doc.flags, "from_shopify", False):
-        return
-    
-    shopify = frappe.get_single("Shopify Connector Setting")
-
-    if shopify.enable_shopify == False:
-        return
-    
-    address = f"{doc.address_line_1} {doc.address_line_2 or ''}"
-    country = "India"
-    # city = doc.city or " "
-    # province = doc.state or " "
-    # postal_code = doc.pin or "000000"
-    # phone = doc.phone_no or ""
-    country_code,state_code=get_country_and_state_codes(doc.custom_country,doc.state)
-
-    query = f"""
-    mutation {{
-        locationAdd(input: {{
-            name: "{doc.name}",
-            address: {{
-                address1:"",
-                address2: "{address}",
-                city: "{doc.city}",
-                provinceCode: "{state_code}",
-                countryCode: {country_code},
-                zip: "{doc.pin if doc.pin else '000000'}"
-                phone: "{doc.phone_no if doc.phone_no else ''}"
-            }},
-            fulfillsOnlineOrders: true
-        }}) {{
-            location {{
-                id
-                name
-                address {{
-                    address1
-                    provinceCode
-                    countryCode
-                    zip
-                    phone
-                }}
-                fulfillsOnlineOrders
-            }}
-        }}
+    if doc.custom_send_to_shopify:
+        if doc.flags.ignore_shopify_sync:
+            return
         
-    }}
-    """
+        if getattr(doc.flags, "from_shopify", False):
+            return
+        
+        shopify = frappe.get_single("Shopify Connector Setting")
 
-    headers = {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": shopify_credentials().get("access_token")
-    }
+        if shopify.enable_shopify == False:
+            return
+        
+        address = f"{doc.address_line_1} {doc.address_line_2 or ''}"
+        country = "India"
+        # city = doc.city or " "
+        # province = doc.state or " "
+        # postal_code = doc.pin or "000000"
+        # phone = doc.phone_no or ""
+        country_code,state_code=get_country_and_state_codes(doc.custom_country,doc.state)
 
-    response = requests.post(shopify_credentials().get("shopify_graph_url"), json={"query": query}, headers=headers)
+        query = f"""
+        mutation {{
+            locationAdd(input: {{
+                name: "{doc.name}",
+                address: {{
+                    address1:"",
+                    address2: "{address}",
+                    city: "{doc.city}",
+                    provinceCode: "{state_code}",
+                    countryCode: {country_code},
+                    zip: "{doc.pin if doc.pin else '000000'}"
+                    phone: "{doc.phone_no if doc.phone_no else ''}"
+                }},
+                fulfillsOnlineOrders: true
+            }}) {{
+                location {{
+                    id
+                    name
+                    address {{
+                        address1
+                        provinceCode
+                        countryCode
+                        zip
+                        phone
+                    }}
+                    fulfillsOnlineOrders
+                }}
+            }}
+            
+        }}
+        """
 
-    if response.status_code != 200 or "errors" in response.json():
-        frappe.log_error(f"Shopify location creation failed: {response.text}")
-        return
-    
-    response_json = response.json()
-    data = response_json.get("data")
-    locationAdd = data.get("locationAdd") if data else None
-    location = locationAdd.get("location") if locationAdd else None
+        headers = {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": shopify_credentials().get("access_token")
+        }
 
-    if not location:
-        frappe.log_error("No location data")
-        return
+        response = requests.post(shopify_credentials().get("shopify_graph_url"), json={"query": query}, headers=headers)
 
-    location_get = location.get("id")
-    if location_get:
-        location_id = location_get.split("/")[-1]
-        doc.custom_shopify_id = location_id
-        doc.flags.from_shopify = True  
-        doc.save(ignore_permissions=True)
-        frappe.msgprint(f"Shopify location created for warehouse {doc.name}")
-    else:
-        frappe.log_error("Shopify location ID missing ")
+        if response.status_code != 200 or "errors" in response.json():
+            frappe.log_error(f"Shopify location creation failed: {response.text}")
+            return
+        
+        response_json = response.json()
+        data = response_json.get("data")
+        locationAdd = data.get("locationAdd") if data else None
+        location = locationAdd.get("location") if locationAdd else None
+
+        if not location:
+            frappe.log_error("No location data")
+            return
+
+        location_get = location.get("id")
+        if location_get:
+            location_id = location_get.split("/")[-1]
+            doc.custom_shopify_id = location_id
+            doc.flags.from_shopify = True  
+            doc.save(ignore_permissions=True)
+            frappe.msgprint(f"Shopify location created for warehouse {doc.name}")
+        else:
+            frappe.log_error("Shopify location ID missing ")
 
 
 def activate_deactivate_shopify_location(doc, method):

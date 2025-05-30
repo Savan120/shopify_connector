@@ -2,28 +2,28 @@
  "Item": [
   {
    "dt": "Item",
-   "fieldname": "custom_variant_id",
-   "fieldtype": "Data",
-   "insert_after": "custom_inventory_item_id",
-   "label": "variant id",
+   "fieldname": "custom_send_to_shopify",
+   "fieldtype": "Check",
+   "insert_after": "has_variants",
+   "label": "Send to Shopify",
    "module": "Shopify Connector"
   },
   {
    "dt": "Item",
-   "fieldname": "custom_inventory_item_id",
+   "fieldname": "shopify_id",
    "fieldtype": "Data",
-   "insert_after": "shopify_id",
-   "label": "inventory item id",
+   "is_system_generated": 1,
+   "label": "Shopify ID",
    "module": "Shopify Connector",
    "read_only": 1
   },
   {
    "dt": "Item",
-   "fieldname": "is_ineligible_for_itc",
-   "fieldtype": "Check",
-   "insert_after": "item_tax_section_break",
+   "fieldname": "shopify_selling_rate",
+   "fieldtype": "Currency",
+   "insert_after": "standard_rate",
    "is_system_generated": 1,
-   "label": "Is Ineligible for Input Tax Credit",
+   "label": "Shopify Selling Rate",
    "module": "Shopify Connector"
   },
   {
@@ -42,20 +42,30 @@
   },
   {
    "dt": "Item",
-   "fieldname": "shopify_id",
-   "fieldtype": "Data",
+   "fieldname": "is_ineligible_for_itc",
+   "fieldtype": "Check",
+   "insert_after": "item_tax_section_break",
    "is_system_generated": 1,
-   "label": "Shopify ID",
+   "label": "Is Ineligible for Input Tax Credit",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_inventory_item_id",
+   "fieldtype": "Data",
+   "insert_after": "shopify_id",
+   "is_system_generated": 1,
+   "label": "inventory item id",
    "module": "Shopify Connector",
    "read_only": 1
   },
   {
    "dt": "Item",
-   "fieldname": "shopify_selling_rate",
-   "fieldtype": "Currency",
-   "insert_after": "standard_rate",
+   "fieldname": "custom_variant_id",
+   "fieldtype": "Data",
+   "insert_after": "custom_inventory_item_id",
    "is_system_generated": 1,
-   "label": "Shopify Selling Rate",
+   "label": "variant id",
    "module": "Shopify Connector"
   }
  ]
