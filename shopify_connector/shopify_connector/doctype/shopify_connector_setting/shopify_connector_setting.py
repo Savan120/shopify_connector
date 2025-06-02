@@ -29,10 +29,10 @@ class ShopifyConnectorSetting(Document):
     
     def validate(self):
         if self.enable_shopify:
-            setup_custom_fields()
-            create_delete_custom_fields(self)
+            # setup_custom_fields()
+            # create_delete_custom_fields(self)
             # product_creation()
-            customer_creation()
+            customer_creation() 
             # get_order() 
             # get_shopify_location()
             # sync_shopify_products_to_erpnext()
