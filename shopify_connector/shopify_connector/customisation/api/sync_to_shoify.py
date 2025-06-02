@@ -5,10 +5,10 @@ from frappe.utils.background_jobs import enqueue
 
 def enqueue_send_customer_to_shopify(doc, method):
     if not getattr(doc.flags, "from_shopify", False):
-        enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc)
+        # send_customer_to_shopify_hook_delayed(doc)
+        enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
 
 def send_customer_to_shopify_hook_delayed(doc):
-    doc = frappe.get_doc("Customer", doc.name)
     send_customer_to_shopify_hook(doc, "after_insert") 
 
 def send_customer_to_shopify_hook(doc, method):
@@ -19,19 +19,19 @@ def send_customer_to_shopify_hook(doc, method):
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
-    SHOPIFY_API_VERSION = "2024-01"
+    SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
 
     if shopify_keys.sync_customer:
 
         email = ""
         phone = ""
 
-
         address_links = frappe.get_all("Dynamic Link", filters={
             "link_doctype": "Customer",
             "link_name": doc.name,
             "parenttype": "Address"
         }, fields=["parent"])
+        
 
 
         if not address_links and doc.customer_name != doc.name:
@@ -101,7 +101,6 @@ def send_customer_to_shopify_hook(doc, method):
                 customer_payload["customer"]["id"] = shopify_customer_id
                 url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}.json"
                 response = requests.put(url, json=customer_payload, verify=False)
-                print(response.text)
             else:
                 url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers.json"
                 response = requests.post(url, json=customer_payload, verify=False)
@@ -114,7 +113,7 @@ def send_customer_to_shopify_hook(doc, method):
                 shopify_email = response.json()["customer"]["email"]
                 doc.flags.from_shopify = True
                 doc.db_set("shopify_id",shopify_id)
-                # doc.db_set("shopify_email",shopify_email)
+                doc.db_set("shopify_email",shopify_email)
 
         except Exception as e:
             frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
