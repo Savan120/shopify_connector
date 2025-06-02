@@ -1,5 +1,3 @@
-# Copyright (c) 2024, Solufy and contributors
-# For license information, please see license.txt
 
 import frappe
 from frappe.model.document import Document
@@ -386,17 +384,13 @@ def get_order():
                 warehouse = settings.warehouse or f"Stores - {company_abbr}"
 
             customer = order_data.get("customer", {})
-            print(f"\n\n\n\nCUSTOMER {customer}")
 
             customer_email = customer.get("email")
-            print(f"\n\n\n\nCUSTOMER EMAIL {customer_email}")
             id = customer.get("id")
-            print(f"\n\n\n\nCUSTOMER ID {id}")
             customer_name = (
                 (customer.get("first_name") or "") + " " + (customer.get("last_name") or "")
             )
             customer_name = customer_name.strip() or "Guest"
-            print(f"\n\n\n\nCUSTOMER Name {customer_name}")
 
             created_date = order_data.get("created_at", "").split("T")[0]
             items = order_data.get("line_items", [])
@@ -434,8 +428,14 @@ def get_order():
             sales_order.discount_amount = discount_fixed
 
             for item in items:
+                variant_id = item.get("variant_id")
+                variant_title = item.get("variant_title")
                 product_id = item.get("product_id")
-                item_code = frappe.db.get_value("Item", {"shopify_id": product_id})
+                item_code = None
+                if variant_title:
+                    item_code = frappe.db.get_value("Item", {"shopify_id": variant_id})
+                else:
+                    item_code = frappe.db.get_value("Item", {"shopify_id": product_id})
                 if not item_code:
                     item_code = product_creation()
                 if item.get("tax_lines"):
@@ -594,13 +594,13 @@ def customer_creation():
                 cus_contact.first_name = address.get("first_name")
                 cus_contact.middle_name = address.get("middle_name") or ""
                 cus_contact.last_name = address.get("last_name")
-                cus_contact.append(
-                    "email_ids",
-                    {
-                        "email_id": order_data.get("email"),
-                        "is_primary": 1,
-                    },
-                )
+                # cus_contact.append(
+                #     "email_ids",
+                #     {
+                #         "email_id": order_data.get("email"),
+                #         "is_primary": 1,
+                #     },
+                # )
                 cus_contact.append(
                     "phone_nos",
                     {
@@ -736,6 +736,7 @@ def product_creation():
             for v in order_data.get("variants", []):
                 variant = frappe.new_doc("Item")
                 variant.item_code = order_data.get("title") +"-"+ v.get("title")
+                variant.shopify_id= v.get("id")
                 variant.item_name = order_data.get("title") +"-"+ v.get("title")
                 variant.item_group = _("Shopify Products", sys_lang)
                 variant.variant_of = item.name
@@ -932,5 +933,3 @@ def add_tax_details(sales_order, ordered_items_tax, desc, tax_account_head=None)
 
 #     return response.json()
 ###################################################
-
-

@@ -2,14 +2,6 @@
  "Customer": [
   {
    "dt": "Customer",
-   "fieldname": "custom_send_to_shopify",
-   "fieldtype": "Check",
-   "insert_after": "shopify_id",
-   "label": "Send to Shopify",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
    "fieldname": "shopify_email",
    "fieldtype": "Data",
    "is_system_generated": 1,

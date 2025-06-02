@@ -341,7 +341,7 @@ def customer_creation():
 			)
 			frappe.throw("Invalid JSON payload.")
 
-		print(order_data)
+		print(f"\n\n\n\n\n{order_data}\n\n\n\n")
 
 		customer_id = order_data.get("id")
 		shop_url = "https://mysolufy.myshopify.com"
@@ -363,6 +363,7 @@ def customer_creation():
 		if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
 			cus = frappe.new_doc("Customer")
 			cus.flags.from_shopify = True
+			cus.shopify_id = customer_id
 			cus.shopify_email = order_data.get("email")
 			cus.customer_name = customer_name
 			cus.default_currency = order_data.get("currency")

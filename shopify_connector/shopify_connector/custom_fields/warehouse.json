@@ -2,14 +2,6 @@
  "Warehouse": [
   {
    "dt": "Warehouse",
-   "fieldname": "custom_send_to_shopify",
-   "fieldtype": "Check",
-   "insert_after": "disabled",
-   "label": "Send to Shopify",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Warehouse",
    "fieldname": "custom_shopify_id",
    "fieldtype": "Data",
    "insert_after": "warehouse_name",
