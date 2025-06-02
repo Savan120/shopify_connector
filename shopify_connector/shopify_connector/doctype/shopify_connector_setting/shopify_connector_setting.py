@@ -562,6 +562,7 @@ def customer_creation():
             cus = frappe.new_doc("Customer")
             cus.flags.from_shopify = True
             cus.shopify_email = order_data.get("email")
+            cus.shopify_id = order_data.get("id")
             cus.customer_name = customer_name
             cus.default_currency = order_data.get("currency")
             cus.flags.ignore_permissions = True
