@@ -29,13 +29,13 @@ class ShopifyConnectorSetting(Document):
     
     def validate(self):
         if self.enable_shopify:
-            product_creation()
-            customer_creation()
-            get_order() 
-            get_shopify_location()
-            # sync_shopify_products_to_erpnext()
             setup_custom_fields()
             create_delete_custom_fields(self)
+            # product_creation()
+            customer_creation()
+            # get_order() 
+            # get_shopify_location()
+            # sync_shopify_products_to_erpnext()
             # get_inv_level()
             # get_inventory_levels_for_all_items()
 
