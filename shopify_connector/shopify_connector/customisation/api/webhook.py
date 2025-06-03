@@ -429,9 +429,9 @@ def customer_creation():
                 cus_contact.insert(ignore_mandatory=True)
                 cus_contact.save()
                 
-            cus.customer_primary_contact = cus_contact.name
-            cus.customer_primary_address = cus_address.name
-            cus.save()
+                cus.customer_primary_contact = cus_contact.name
+                cus.customer_primary_address = cus_address.name
+                cus.save()
 
             frappe.msgprint(
                 _("Customer created for email: {0}").format(order_data.get("email"))

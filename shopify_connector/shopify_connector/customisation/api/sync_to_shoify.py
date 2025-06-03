@@ -5,7 +5,6 @@ from frappe.utils.background_jobs import enqueue
 
 def enqueue_send_customer_to_shopify(doc, method):
     if not getattr(doc.flags, "from_shopify", False):
-        # send_customer_to_shopify_hook_delayed(doc)
         enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
 
 def send_customer_to_shopify_hook_delayed(doc):
@@ -32,7 +31,6 @@ def send_customer_to_shopify_hook(doc, method):
             "parenttype": "Address"
         }, fields=["parent"])
         
-
 
         if not address_links and doc.customer_name != doc.name:
             address_links = frappe.get_all("Dynamic Link", filters={
@@ -63,7 +61,6 @@ def send_customer_to_shopify_hook(doc, method):
                 })
         elif doc.get("customer_primary_address"):
             primary_address = frappe.get_doc("Address", doc.customer_primary_address)
-            print("elif",primary_address)
             email = primary_address.email_id or ""
             phone = primary_address.phone or ""
             address_list.append({
@@ -89,7 +86,7 @@ def send_customer_to_shopify_hook(doc, method):
                 "first_name": doc.customer_name or "",
                 "email": email,
                 "phone": phone,
-                "addresses": address_list,
+                "addresses": address_list or [],
                 "tags":doc.customer_group or ""
             }
         }
