@@ -814,7 +814,8 @@ def customer_update():
     print(customer_name)
 
     if frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
-        cus = frappe.get_doc("Customer", {"shopify_email": order_data.get("email")})
+        cus = frappe.get_doc("Customer", {"shopify_email": order_data.get("email"), "shopify_id": order_data.get("id")})
+        frappe.log_error(cus, cus.name)
         cus.db_set("shopify_email", order_data.get("email"))
 
         cus.db_set(
