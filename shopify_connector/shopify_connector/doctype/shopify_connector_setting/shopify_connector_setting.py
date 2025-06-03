@@ -34,7 +34,7 @@ class ShopifyConnectorSetting(Document):
             product_creation()
             customer_creation() 
             # get_order() 
-            # get_shopify_location()
+            get_shopify_location()
             # sync_shopify_products_to_erpnext()
             # get_inv_level()
             # get_inventory_levels_for_all_items()
