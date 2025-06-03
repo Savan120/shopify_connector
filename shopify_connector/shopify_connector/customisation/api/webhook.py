@@ -808,15 +808,15 @@ def customer_update():
         
     frappe.log_error("order", order_data)
   
-    # first_name = order_data.get("first_name")
-    # last_name = order_data.get("last_name")
+    first_name = order_data.get("first_name")
+    last_name = order_data.get("last_name")
 
-    # if last_name:
-    #     customer_name = f"{first_name} {last_name}"
-    # else:
-    #     customer_name = first_name
+    if last_name:
+        customer_name = f"{first_name} {last_name}"
+    else:
+        customer_name = first_name
         
-    # print(first_name)
+    print(first_name)
         
 
     if frappe.db.exists("Customer", {"shopify_id": order_data.get("id")}):
@@ -827,7 +827,7 @@ def customer_update():
             return
 
         customer.flags.ignore_permissions = True 
-
+        customer.db_set("customer_name", customer_name) 
         customer.db_set("shopify_email", order_data.get("email"))
         customer.db_set("default_currency", order_data.get("currency"))
         customer.save()
