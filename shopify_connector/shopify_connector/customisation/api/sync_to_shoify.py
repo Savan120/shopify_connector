@@ -354,7 +354,7 @@ def delete_customer_from_shopify(doc, method):
 #                 if sku and variant_id:
 #                     try:
 #                         frappe.db.set_value("Item", {"item": item.name}, {
-#                             "shopify_variant_id": variant_id,
+#                             "custom_variant_id": variant_id,
 #                             "custom_inventory_item_id": inventory_item_id
 #                         })
 #                         print("/////")
@@ -443,117 +443,124 @@ def send_item_to_shopify(doc, method):
             site_url = "https://" + site_url
         image_url = site_url + item.image
 
+    product_shopify_id_to_update = None
+    frappe_template_item_name = None
+
     if item.variant_of:
-        print("variantof")
-        variants_of = frappe.get_value("Item", doc.name, "variant_of")
-        variant_parent_shopify_id = frappe.get_value("Item", variants_of, "shopify_id")
-        parent_doc = frappe.get_doc("Item", {"shopify_id": variant_parent_shopify_id})
-        product_payload = {
-            "product": {
-                "title": parent_doc.item_name,
-                "body_html": f"<strong>{parent_doc.description or ''}</strong>",
-                "vendor": parent_doc.brand or "Default Vendor",
-                "product_type": parent_doc.item_group or "",
-                "sku": parent_doc.item_code,
-                "variants": [],
-                "images": [],
-                "options": [],
-            }
-        }
-
-        if image_url:
-            product_payload["product"]["images"].append({"src": image_url})
-
-        template_item = parent_doc.name
-        variant_items = frappe.get_all("Item", filters={"variant_of": template_item}, fields=["name", "item_code", "shopify_selling_rate", "image"])
-
-        if not variant_items:
-            print("kkkkkkkkkkkkkkkkkkkkkk")
-            product_payload["product"]["variants"].append({
-                "price": item.shopify_selling_rate or 0.0
-            })
-        else:
-            print("aaaaaaaaaaaaaaaaaaaaaaaaaaazzzzzzzzzzzzzzz")
-
-            template_attributes = frappe.get_all(
-                "Item Variant Attribute",
-                filters={"parent": template_item},
-                fields=["attribute"],
-                order_by="idx asc" 
-            )
-            attribute_order = [attr["attribute"] for attr in template_attributes]
-
-
-            option_map = {attr: set() for attr in attribute_order}
-
-
-            for position, variant in enumerate(variant_items, start=1):
-                variant_doc = frappe.get_doc("Item", variant["name"])
-
-                attributes = frappe.get_all(
-                    "Item Variant Attribute",
-                    filters={"parent": variant_doc.name},
-                    fields=["attribute", "attribute_value"]
-                )
-                attr_dict = {attr.attribute: attr.attribute_value for attr in attributes}
-
-
-                for attr in attribute_order:
-                    if attr in attr_dict:
-                        option_map[attr].add(attr_dict[attr])
-
-
-                values = [attr_dict.get(attr) for attr in attribute_order]
-
-                values += [None] * (3 - len(values))
-
-
-                variant_data = {
-                    "option1": values[0],
-                    "option2": values[1],
-                    "option3": values[2],
-                    "price": variant_doc.shopify_selling_rate or 0.0,
-                    "sku": variant_doc.item_code,
-                    "inventory_policy": "deny",
-                    "taxable": True,
-                    "position": position
-                }
-
-                product_payload["product"]["variants"].append(variant_data)
-
-
-                if variant_doc.image:
-                    product_payload["product"]["images"].append({
-                        "src": site_url + variant_doc.image
-                    })
-
-
-            for attr in attribute_order:
-                product_payload["product"]["options"].append({
-                    "name": attr,
-                    "values": list(option_map[attr])
-                })
-
-    elif not item.has_variants or not item.variant_of:
-        print("ellllllllllll")
-        product_payload = {
-            "product": {
-                "title": item.item_name,
-                "body_html": f"<strong>{item.description or ''}</strong>",
-                "vendor": item.brand or "Default Vendor",
-                "product_type": item.item_group or "",
-                "sku": item.item_code,
-                "variants": [],
-                "images": [],
-            }
-        }
-        product_payload["product"]["variants"].append({
-            "price": item.shopify_selling_rate or 0.0
-        })
-        if image_url:
-            product_payload["product"]["images"].append({"src": image_url})
+        frappe_template_item_name = frappe.get_value("Item", doc.name, "variant_of")
+        product_shopify_id_to_update = frappe.get_value("Item", frappe_template_item_name, "shopify_id")
+        parent_doc = frappe.get_doc("Item", frappe_template_item_name)
+    elif item.has_variants:
+        frappe_template_item_name = item.name
+        product_shopify_id_to_update = item.shopify_id
+        parent_doc = item
     else:
-        print("elssssssssssssssssssssssss")
+        product_shopify_id_to_update = item.shopify_id
+        parent_doc = item 
+
+    product_payload = {
+        "product": {
+            "title": parent_doc.item_name,
+            "body_html": f"<strong>{parent_doc.description or ''}</strong>",
+            "vendor": parent_doc.brand or "Default Vendor",
+            "product_type": parent_doc.item_group or "",
+            "sku": parent_doc.item_code if not parent_doc.has_variants else None,
+            "variants": [],
+            "images": [],
+            "options": [],
+        }
+    }
+
+    if image_url:
+        product_payload["product"]["images"].append({"src": image_url})
+
+    if frappe_template_item_name:
+        variant_items_from_frappe = frappe.get_all(
+            "Item",
+            filters={"variant_of": frappe_template_item_name},
+            fields=["name", "item_code", "shopify_selling_rate", "image", "custom_variant_id"]
+        )
+
+        template_attributes = frappe.get_all(
+            "Item Variant Attribute",
+            filters={"parent": frappe_template_item_name},
+            fields=["attribute"],
+            order_by="idx asc"
+        )
+        attribute_order = [attr["attribute"] for attr in template_attributes]
+        option_map = {attr: set() for attr in attribute_order}
+
+        existing_shopify_product = None
+        if product_shopify_id_to_update:
+            get_product_url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"
+            try:
+                get_response = requests.get(get_product_url, verify=False)
+                if get_response.status_code == 200:
+                    existing_shopify_product = get_response.json()["product"]
+            except requests.exceptions.RequestException as e:
+                frappe.log_error(f"Failed to fetch existing Shopify product {product_shopify_id_to_update}: {e}", "Shopify Sync Error")
+
+        existing_shopify_variants_map = {}
+        if existing_shopify_product and "variants" in existing_shopify_product:
+            for sv in existing_shopify_product["variants"]:
+                existing_shopify_variants_map[sv["sku"]] = sv
+
+        variants_to_send_to_shopify = []
+        images_to_send_to_shopify = []
+
+        for position, variant_frappe in enumerate(variant_items_from_frappe, start=1):
+            variant_doc = frappe.get_doc("Item", variant_frappe["name"])
+
+            attributes = frappe.get_all(
+                "Item Variant Attribute",
+                filters={"parent": variant_doc.name},
+                fields=["attribute", "attribute_value"]
+            )
+            attr_dict = {attr.attribute: attr.attribute_value for attr in attributes}
+
+            for attr in attribute_order:
+                if attr in attr_dict:
+                    option_map[attr].add(attr_dict[attr])
+
+            values = [attr_dict.get(attr) for attr in attribute_order]
+            values += [None] * (3 - len(values))
+
+            variant_data = {
+                "option1": values[0],
+                "option2": values[1],
+                "option3": values[2],
+                "price": variant_doc.shopify_selling_rate or 0.0,
+                "sku": variant_doc.item_code,
+                "inventory_policy": "deny",
+                "taxable": True,
+                "position": position,
+            }
+
+            if variant_frappe.get("custom_variant_id"):
+                variant_data["id"] = variant_frappe["custom_variant_id"]
+            elif variant_frappe["item_code"] in existing_shopify_variants_map:
+                variant_data["id"] = existing_shopify_variants_map[variant_frappe["item_code"]]["id"]
+                frappe.db.set_value("Item", variant_frappe["name"], "custom_variant_id", variant_data["id"])
+
+
+            variants_to_send_to_shopify.append(variant_data)
+
+            if variant_doc.image:
+                variant_image_url = site_url + variant_doc.image
+                if {"src": variant_image_url} not in images_to_send_to_shopify and {"src": variant_image_url} not in product_payload["product"]["images"]:
+                    images_to_send_to_shopify.append({"src": variant_image_url})
+
+        product_payload["product"]["images"].extend(images_to_send_to_shopify)
+        product_payload["product"]["variants"] = variants_to_send_to_shopify
+
+        for attr in attribute_order:
+            product_payload["product"]["options"].append({
+                "name": attr,
+                "values": list(option_map[attr])
+            })
+
+    elif not item.has_variants:
+        print("Simple product processing")
         product_payload = {
             "product": {
                 "title": item.item_name,
@@ -563,131 +570,60 @@ def send_item_to_shopify(doc, method):
                 "sku": item.item_code,
                 "variants": [],
                 "images": [],
-                "options": []
             }
         }
+        variant_data = {
+            "price": item.shopify_selling_rate or 0.0,
+            "sku": item.item_code,
+            "inventory_policy": "deny",
+            "taxable": True,
+        }
+        if item.custom_variant_id:
+            variant_data["id"] = item.custom_variant_id
+
+        product_payload["product"]["variants"].append(variant_data)
+
         if image_url:
             product_payload["product"]["images"].append({"src": image_url})
 
-        template_item = item.name
-        variant_items = frappe.get_all("Item", filters={"variant_of": template_item}, fields=["name", "item_code", "shopify_selling_rate", "image"])
-
-        if not variant_items:
-            product_payload["product"]["variants"].append({
-                "price": item.shopify_selling_rate or 0.0
-            })
-        else:
-
-            template_attributes = frappe.get_all(
-                "Item Variant Attribute",
-                filters={"parent": template_item},
-                fields=["attribute"],
-                order_by="idx asc"  
-            )
-            attribute_order = [attr["attribute"] for attr in template_attributes]
-
-
-            option_map = {attr: set() for attr in attribute_order}
-
-            for position, variant in enumerate(variant_items, start=1):
-                variant_doc = frappe.get_doc("Item", variant["name"])
-
-
-                attributes = frappe.get_all(
-                    "Item Variant Attribute",
-                    filters={"parent": variant_doc.name},
-                    fields=["attribute", "attribute_value"]
-                )
-                attr_dict = {attr.attribute: attr.attribute_value for attr in attributes}
-
-
-                for attr in attribute_order:
-                    if attr in attr_dict:
-                        option_map[attr].add(attr_dict[attr])
-
-
-                values = [attr_dict.get(attr) for attr in attribute_order]
-
-                values += [None] * (3 - len(values))
-
-                variant_data = {
-                    "option1": values[0],
-                    "option2": values[1],
-                    "option3": values[2],
-                    "price": variant_doc.shopify_selling_rate or 0.0,
-                    "sku": variant_doc.item_code,
-                    "inventory_policy": "deny",
-                    "taxable": True,
-                    "position": position
-                }
-
-                product_payload["product"]["variants"].append(variant_data)
-
-
-                if variant_doc.image:
-                    product_payload["product"]["images"].append({
-                        "src": site_url + variant_doc.image
-                    })
-
-            for attr in attribute_order:
-                product_payload["product"]["options"].append({
-                    "name": attr,
-                    "values": list(option_map[attr])
-                })
 
     if doc.custom_send_to_shopify:
-        if item.variant_of:
-            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{variant_parent_shopify_id}.json"
+        if product_shopify_id_to_update:
+            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"
             response = requests.put(url, json=product_payload, verify=False)
+            print("Updating existing product/variants")
             doc.flags.from_shopify = True
-            print("if")
-            print(response.text)
-        elif item.shopify_id:
-            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{item.shopify_id}.json"
-            response = requests.put(url, json=product_payload, verify=False)
-            print("elif")
+        else: 
+            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
+            response = requests.post(url, json=product_payload, verify=False)
+            print(response.json())
+            print("Creating new product")
 
-            shopify_product = response.json()
+        if response.status_code == 201:
+            shopify_product = response.json()["product"]
+            frappe.db.set_value("Item", item.name, "shopify_id", shopify_product["id"])
+            item.shopify_id = shopify_product["id"]
+
             for variant in shopify_product.get("variants", []):
                 sku = variant.get("sku")
                 variant_id = variant.get("id")
                 inventory_item_id = variant.get("inventory_item_id")
-                frappe.db.set_value("Item", item.name, {
-                    "custom_inventory_item_id": inventory_item_id,
-                })
-                print("/////")
-                update_shopify_hsn_code(item.gst_hsn_code, inventory_item_id)
-                doc.flags.from_shopify = True
-        else:
-            url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
-            response = requests.post(url, json=product_payload, verify=False)
-            print("\n\nresponse",response)
-            print("else last")
-            if response.status_code == 201:
-                shopify_product = response.json()["product"]
-                frappe.db.set_value("Item", item.name, "shopify_id", shopify_product["id"])
-                item.shopify_id = shopify_product["id"]
+                if variant_id:
+                    try:
+                        frappe.db.set_value("Item", {"item": item.name}, {
+                            "shopify_variant_id": variant_id,
+                            "custom_inventory_item_id": inventory_item_id
+                        })
+                        update_shopify_hsn_code(item.gst_hsn_code, inventory_item_id)
+                        doc.flags.from_shopify = True
+                    except Exception as e:
+                        frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku}: {str(e)}", "Shopify Sync")
+                        doc.flags.from_shopify = True
 
-                for variant in shopify_product.get("variants", []):
-                    sku = variant.get("sku")
-                    variant_id = variant.get("id")
-                    inventory_item_id = variant.get("inventory_item_id")
-                    if variant_id:
-                        try:
-                            frappe.db.set_value("Item", {"item": item.name}, {
-                                "shopify_variant_id": variant_id,
-                                "custom_inventory_item_id": inventory_item_id
-                            })
-                            print("/////")
-                            update_shopify_hsn_code(item.gst_hsn_code, inventory_item_id)
-                            doc.flags.from_shopify = True
-                        except Exception as e:
-                            frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku}: {str(e)}", "Shopify Sync")
-                            doc.flags.from_shopify = True
+        if response.status_code not in (200, 201):
+            frappe.log_error(f"Shopify product/variant sync failed: {response.text}", "Shopify Sync Error")
+            return
 
-            if response.status_code not in (200, 201):
-                frappe.log_error(f"Shopify product/variant sync failed: {response.text}", "Shopify Sync Error")
-                return
 
 
 
