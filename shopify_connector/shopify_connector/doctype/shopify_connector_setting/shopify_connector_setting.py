@@ -29,9 +29,9 @@ class ShopifyConnectorSetting(Document):
     
     def validate(self):
         if self.enable_shopify:
-            # setup_custom_fields()
+            setup_custom_fields()
             # create_delete_custom_fields(self)
-            # product_creation()
+            product_creation()
             customer_creation() 
             # get_order() 
             # get_shopify_location()
@@ -552,18 +552,36 @@ def customer_creation():
         frappe.throw(f"Failed to fetch product data: {response.text}")
 
     order_data = response.json()
+            
     customer_data = order_data.get("customers", [])
     for order_data in customer_data:
+        customers_group = ""
+        if order_data.get("tags"):
+            get_customer_group = frappe.db.get_value("Customer Group", {"customer_group_name": order_data.get("tags")})
+            if not get_customer_group:
+                customer_group = frappe.new_doc("Customer Group")
+                customer_group.customer_group_name = order_data.get("tags")
+                customer_group.flags.ignore_permissions = True
+                customer_group.insert(ignore_mandatory=True)
+                customer_group.save()
+                customers_group = customer_group.name
 
         first_name = order_data.get("first_name")
         last_name = order_data.get("last_name")
-        customer_name = f"{first_name} {last_name}".strip()
+        
+        if last_name:
+            customer_name =f"{first_name} {last_name}".strip()
+        else:
+            customer_name = first_name
+            
+        print(first_name)
         if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
             cus = frappe.new_doc("Customer")
             cus.flags.from_shopify = True
             cus.shopify_email = order_data.get("email")
             cus.shopify_id = order_data.get("id")
             cus.customer_name = customer_name
+            cus.customer_group = order_data.get("tags") or customers_group
             cus.default_currency = order_data.get("currency")
             cus.flags.ignore_permissions = True
             cus.insert(ignore_mandatory=True)
@@ -577,7 +595,7 @@ def customer_creation():
                 cus_address.address_line1 = address.get("address1")
                 cus_address.address_line2 = address.get("address2")
                 cus_address.city = address.get("city")
-                cus_address.state = address.get("province")     
+                cus_address.state = address.get("province")  
                 cus_address.country = address.get("country")
                 cus_address.postal_code = address.get("zip")
                 cus_address.append(
@@ -595,18 +613,19 @@ def customer_creation():
                 cus_contact.first_name = address.get("first_name")
                 cus_contact.middle_name = address.get("middle_name") or ""
                 cus_contact.last_name = address.get("last_name")
-                # cus_contact.append(
-                #     "email_ids",
-                #     {
-                #         "email_id": order_data.get("email"),
-                #         "is_primary": 1,
-                #     },
-                # )
+                cus_contact.append(
+                    "email_ids",
+                    {
+                        "email_id": order_data.get("email"),
+                        "is_primary": 1,
+                    },
+                )
                 cus_contact.append(
                     "phone_nos",
                     {
                         "phone": order_data.get("phone"),
                         "is_primary_phone": 1,
+                        "is_primary_mobile_no":1
                     },
                 )
                 cus_contact.append(

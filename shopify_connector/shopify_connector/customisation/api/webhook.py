@@ -428,6 +428,10 @@ def customer_creation():
                 cus_contact.flags.ignore_permissions = True
                 cus_contact.insert(ignore_mandatory=True)
                 cus_contact.save()
+                
+            cus.customer_primary_contact = cus_contact.name
+            cus.customer_primary_address = cus_address.name
+            cus.save()
 
             frappe.msgprint(
                 _("Customer created for email: {0}").format(order_data.get("email"))
@@ -813,45 +817,98 @@ def customer_update():
     else:
         customer_name = first_name
         
-    print(order_data)
+    print(first_name)
+        
 
-    
+    if frappe.db.exists("Customer", {"shopify_id": order_data.get("id")}):
+        customer = frappe.get_doc("Customer", {"shopify_id": order_data.get("id")})
 
-    if frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
-        cus = frappe.get_doc("Customer", {"shopify_email": order_data.get("email")})
-        print(cus, cus.name)
-        cus.db_set("shopify_email", order_data.get("email"))
+        if not customer:
+            frappe.msgprint("Customer not found with Shopify ID.")
+            return
 
-        cus.db_set(
-            "customer_name",
-            customer_name
-        )
-        cus.db_set("default_currency", order_data.get("currency"))
-        cus.flags.ignore_mandatory = True
-        customer = frappe.get_doc("Customer", cus.name)
+        customer.flags.ignore_permissions = True 
+
+        customer.db_set("shopify_email", order_data.get("email"))
+        customer.db_set("customer_name", customer_name)
+        customer.db_set("default_currency", order_data.get("currency"))
+        customer.save()
+
         if order_data.get("default_address"):
-            print(order_data.get("default_address"))
             address = order_data.get("default_address")
-            cus_address = frappe.get_doc("Address", cus)
-            cus_address.db_set("address_title",address.get("first_name", "") + " " + address.get("last_name", ""),)
-            cus_address.db_set("address_type", "Shipping")
-            cus_address.db_set("address_line1", address.get("address1"))
-            cus_address.db_set("address_line2", address.get("address2"))
-            cus_address.db_set("city", address.get("city"))
-            cus_address.db_set("state", address.get("province"))
-            cus_address.db_set("country", address.get("country"))
-            cus_address.db_set("pincode", address.get("zip"))
-            cus_address.db_set("phone", address.get("phone"))
-            cus.flags.ignore_mandatory = True
+            
+            if customer.customer_primary_address:
+                cus_address = frappe.get_doc("Address", customer.customer_primary_address)
+                cus_address.db_set("address_title", f"{address.get('first_name', '')} {address.get('last_name', '')}")
+                cus_address.db_set("address_type", "Shipping")
+                cus_address.db_set("address_line1", address.get("address1"))
+                cus_address.db_set("address_line2", address.get("address2"))
+                cus_address.db_set("city", address.get("city"))
+                cus_address.db_set("state", address.get("province"))
+                cus_address.db_set("country", address.get("country"))
+                cus_address.db_set("pincode", address.get("zip"))
+                cus_address.db_set("phone", address.get("phone"))
+                cus_address.flags.ignore_permissions = True
+                cus_address.save()
+            else:
+                frappe.msgprint("No primary address found for the customer.")
 
-        frappe.msgprint(
-            _("Customer created for email: {0}").format(order_data.get("email"))
-        )
+            if customer.customer_primary_contact:
+                contact = frappe.get_doc("Contact", customer.customer_primary_contact)
+
+                new_first_name = order_data.get("first_name")
+                if new_first_name and contact.first_name != new_first_name:
+                    contact.db_set("first_name", new_first_name)
+
+                new_last_name = order_data.get("last_name")
+                if new_last_name and contact.last_name != new_last_name:
+                    contact.db_set("last_name", new_last_name)
+
+                new_email = order_data.get("email")
+                if new_email:
+                    found_email = False
+                    for email_entry in contact.email_ids:
+                        if email_entry.is_primary:
+                            if email_entry.email_id != new_email:
+                                email_entry.email_id = new_email
+                            found_email = True
+                            break
+
+                    if not found_email:
+                        contact.append("email_ids", {
+                            "email_id": new_email,
+                            "is_primary": 1
+                        })
+
+                new_phone = address.get("phone")
+                if new_phone:
+                    found_phone = False
+                    for phone_entry in contact.phone_nos:
+                        if phone_entry.is_primary_phone or phone_entry.is_primary_mobile_no:
+                            if phone_entry.phone != new_phone:
+                                phone_entry.phone = new_phone
+                                phone_entry.is_primary_phone = 1
+                                phone_entry.is_primary_mobile_no = 1
+                            found_phone = True
+                            break
+
+                    if not found_phone:
+                        contact.append("phone_nos", {
+                            "phone": new_phone,
+                            "is_primary_phone": 1,
+                            "is_primary_mobile_no": 1
+                        })
+
+                contact.flags.ignore_permissions = True
+                contact.save()
+            else:
+                frappe.msgprint("No primary contact found for the customer.")
+
+        frappe.msgprint(_("Customer updated for email: {0}").format(order_data.get("email")))
+
     else:
-        frappe.msgprint(
-            _("Customer already exists for email: {0}").format(order_data.get("email"))
-        )
-  
+        frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
+
 
 @frappe.whitelist(allow_guest=True)
 def delete_customer_webhook():
