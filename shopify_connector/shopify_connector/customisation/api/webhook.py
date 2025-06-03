@@ -855,6 +855,10 @@ def customer_update():
                 cus_contact.db_set("middle_name", address.get("middle_name") or "")
                 cus_contact.db_set("last_name", address.get("last_name"))
                 cus_contact.db_set("phone", address.get("phone"))
+                cus_contact.set("email_ids", [])
+                cus_contact.append("email_ids", {
+                    
+                })
                 cus_contact.flags.ignore_permissions = True
                 cus_contact.save()
                 
