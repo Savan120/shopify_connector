@@ -43,7 +43,6 @@ def send_customer_to_shopify_hook(doc, method):
 
         if address_links:
             primary_address = frappe.get_doc("Address", address_links[0]["parent"])
-            print("if",primary_address)
             email = primary_address.email_id or ""
             phone = primary_address.phone or ""
 
@@ -79,7 +78,6 @@ def send_customer_to_shopify_hook(doc, method):
         
         if email == "":
             email = doc.email_id
-
 
         customer_payload = {
             "customer": {

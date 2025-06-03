@@ -341,14 +341,7 @@ def customer_creation():
 
 
         customer_id = order_data.get("id")
-        shop_url = shopify_keys.shop_url
-        access_token = shopify_keys.access_token
-        shopify_url = f"{shop_url}/admin/api/2025-04/customers/{customer_id}.json"
-
-        headers = {"X-Shopify-Access-Token": access_token}
-
-        full_data = requests.get(shopify_url, headers=headers).json()
-        tags = full_data.get("customer", {}).get("tags", "")
+        tags = order_data.get("customer", {}).get("tags", "")
         first_name = order_data.get("first_name")
         last_name = order_data.get("last_name")
 
@@ -374,8 +367,8 @@ def customer_creation():
             cus.flags.ignore_permissions = True
             cus.insert(ignore_mandatory=True)
             cus.save()
-
-            if order_data.get("default_address"):
+            print(cus.name)
+            if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
                 address = order_data.get("default_address")
                 cus_address = frappe.new_doc("Address")
                 cus_address.address_title = cus.customer_name
@@ -396,39 +389,42 @@ def customer_creation():
                 cus_address.flags.ignore_permissions = True
                 cus_address.insert(ignore_mandatory=True)
                 cus_address.save()
-
-                cus_contact = frappe.new_doc("Contact")
-                cus_contact.first_name = address.get("first_name")
-                cus_contact.middle_name = address.get("middle_name") or ""
-                cus_contact.last_name = address.get("last_name")
-                cus_contact.append(
-                    "email_ids",
-                    {
-                        "email_id": order_data.get("email"),
-                        "is_primary": 1,
-                    },
-                )
-                cus_contact.append(
-                    "phone_nos",
-                    {
-                        "phone": order_data.get("phone"),
-                        "is_primary_phone": 1,
-                    },
-                )
-                cus_contact.append(
-                    "links",
-                    {
-                        "link_doctype": "Customer",
-                        "link_name": cus.name,
-                    },
-                )
-                cus_contact.flags.ignore_permissions = True
-                cus_contact.insert(ignore_mandatory=True)
-                cus_contact.save()
-                
-                cus.customer_primary_contact = cus_contact.name
                 cus.customer_primary_address = cus_address.name
                 cus.save()
+        
+            address = order_data.get("default_address")
+            cus_contact = frappe.new_doc("Contact")
+            cus_contact.first_name = address.get("first_name")
+            cus_contact.middle_name = address.get("middle_name") or ""
+            cus_contact.last_name = address.get("last_name")
+            cus_contact.append(
+                "email_ids",
+                {
+                    "email_id": order_data.get("email"),
+                    "is_primary": 1,
+                },
+            )
+            cus_contact.append(
+                "phone_nos",
+                {
+                    "phone": order_data.get("phone"),
+                    "is_primary_phone": 1,
+                },
+            )
+            cus_contact.append(
+                "links",
+                {
+                    "link_doctype": "Customer",
+                    "link_name": cus.name,
+                },
+            )
+            cus_contact.flags.ignore_permissions = True
+            cus_contact.insert(ignore_mandatory=True)
+            cus_contact.save()
+                
+            cus.customer_primary_contact = cus_contact.name
+            
+            cus.save()
 
             frappe.msgprint(
                 _("Customer created for email: {0}").format(order_data.get("email"))

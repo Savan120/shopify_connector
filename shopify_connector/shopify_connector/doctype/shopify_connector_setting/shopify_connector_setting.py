@@ -587,7 +587,7 @@ def customer_creation():
             cus.insert(ignore_mandatory=True)
             cus.save()
 
-            if order_data.get("default_address"):
+            if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
                 address = order_data.get("default_address")
                 cus_address = frappe.new_doc("Address")
                 cus_address.address_title = cus.name
@@ -608,39 +608,41 @@ def customer_creation():
                 cus_address.flags.ignore_permissions = True
                 cus_address.insert(ignore_mandatory=True)
                 cus_address.save()
-
-                cus_contact = frappe.new_doc("Contact")
-                cus_contact.first_name = address.get("first_name")
-                cus_contact.middle_name = address.get("middle_name") or ""
-                cus_contact.last_name = address.get("last_name")
-                cus_contact.append(
-                    "email_ids",
-                    {
-                        "email_id": order_data.get("email"),
-                        "is_primary": 1,
-                    },
-                )
-                cus_contact.append(
-                    "phone_nos",
-                    {
-                        "phone": order_data.get("phone"),
-                        "is_primary_phone": 1,
-                        "is_primary_mobile_no":1
-                    },
-                )
-                cus_contact.append(
-                    "links",
-                    {
-                        "link_doctype": "Customer",
-                        "link_name": cus.name,
-                    },
-                )
-                cus_contact.flags.ignore_permissions = True
-                cus_contact.insert(ignore_mandatory=True)
-                cus_contact.save()
-                frappe.db.set_value("Customer", cus.name, "customer_primary_contact", cus_contact.name)
                 frappe.db.set_value("Customer", cus.name, "customer_primary_address", cus_address.name)
-                
+
+            address = order_data.get("default_address")
+            cus_contact = frappe.new_doc("Contact")
+            cus_contact.first_name = address.get("first_name")
+            cus_contact.middle_name = address.get("middle_name") or ""
+            cus_contact.last_name = address.get("last_name")
+            cus_contact.append(
+                "email_ids",
+                {
+                    "email_id": order_data.get("email"),
+                    "is_primary": 1,
+                },
+            )
+            cus_contact.append(
+                "phone_nos",
+                {
+                    "phone": order_data.get("phone"),
+                    "is_primary_phone": 1,
+                    "is_primary_mobile_no":1
+                },
+            )
+            cus_contact.append(
+                "links",
+                {
+                    "link_doctype": "Customer",
+                    "link_name": cus.name,
+                },
+            )
+            cus_contact.flags.ignore_permissions = True
+            cus_contact.insert(ignore_mandatory=True)
+            cus_contact.save()
+            frappe.db.set_value("Customer", cus.name, "customer_primary_contact", cus_contact.name)
+            
+            
 
 @frappe.whitelist()
 def product_creation():
