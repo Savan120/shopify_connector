@@ -802,6 +802,8 @@ def customer_update():
             f"Failed to parse JSON from request body: {e}", "Shopify Webhook Error"
         )
         frappe.throw("Invalid JSON payload.")
+        
+    frappe.log_error("order", order_data)
   
     first_name = order_data.get("first_name")
     last_name = order_data.get("last_name")
@@ -810,12 +812,14 @@ def customer_update():
         customer_name = f"{first_name} {last_name}"
     else:
         customer_name = first_name
+        
+    print(order_data)
 
-    print(customer_name)
+    
 
     if frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
-        cus = frappe.get_doc("Customer", {"shopify_email": order_data.get("email"), "shopify_id": order_data.get("id")})
-        frappe.log_error(cus, cus.name)
+        cus = frappe.get_doc("Customer", {"shopify_email": order_data.get("email")})
+        print(cus, cus.name)
         cus.db_set("shopify_email", order_data.get("email"))
 
         cus.db_set(
