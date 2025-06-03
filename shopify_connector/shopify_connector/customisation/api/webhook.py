@@ -848,61 +848,17 @@ def customer_update():
                 cus_address.db_set("phone", address.get("phone"))
                 cus_address.flags.ignore_permissions = True
                 cus_address.save()
-            else:
-                frappe.msgprint("No primary address found for the customer.")
 
-        #     if customer.customer_primary_contact:
-        #         contact = frappe.get_doc("Contact", customer.customer_primary_contact)
-
-        #         # new_first_name = order_data.get("first_name")
-        #         # if new_first_name and contact.first_name != new_first_name:
-        #         #     contact.db_set("first_name", new_first_name)
-
-        #         # new_last_name = order_data.get("last_name")
-        #         # if new_last_name and contact.last_name != new_last_name:
-        #         #     contact.db_set("last_name", new_last_name)
-
-        #         new_email = order_data.get("email")
-        #         if new_email:
-        #             found_email = False
-        #             for email_entry in contact.email_ids:
-        #                 if email_entry.is_primary:
-        #                     if email_entry.email_id != new_email:
-        #                         email_entry.email_id = new_email
-        #                     found_email = True
-        #                     break
-
-        #             if not found_email:
-        #                 contact.append("email_ids", {
-        #                     "email_id": new_email,
-        #                     "is_primary": 1
-        #                 })
-
-        #         new_phone = address.get("phone")
-        #         if new_phone:
-        #             found_phone = False
-        #             for phone_entry in contact.phone_nos:
-        #                 if phone_entry.is_primary_phone or phone_entry.is_primary_mobile_no:
-        #                     if phone_entry.phone != new_phone:
-        #                         phone_entry.phone = new_phone
-        #                         phone_entry.is_primary_phone = 1
-        #                         phone_entry.is_primary_mobile_no = 1
-        #                     found_phone = True
-        #                     break
-
-        #             if not found_phone:
-        #                 contact.append("phone_nos", {
-        #                     "phone": new_phone,
-        #                     "is_primary_phone": 1,
-        #                     "is_primary_mobile_no": 1
-        #                 })
-
-        #         contact.flags.ignore_permissions = True
-        #         contact.save()
-        #     else:
-        #         frappe.msgprint("No primary contact found for the customer.")
-
-        # frappe.msgprint(_("Customer updated for email: {0}").format(order_data.get("email")))
+            if customer.customer_primary_contact:
+                cus_contact = frappe.get_doc("Contact", customer.customer_primary_contact)
+                cus_contact.db_set("first_name", address.get("first_name"))
+                cus_contact.db_set("middle_name", address.get("middle_name") or "")
+                cus_contact.db_set("last_name", address.get("last_name"))
+                cus_contact.db_set("phone", address.get("phone"))
+                cus_contact.flags.ignore_permissions = True
+                cus_contact.save()
+                
+            
 
     else:
         frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
@@ -1102,7 +1058,6 @@ def order_update():
             tax_account = frappe.db.get_value(
                 "Item Tax Template", {"gst_rate": tax.get("rate")}
             )
-            print("FFFFFFFFFFFFFFFFFFFFFFFFFFFFF", tax_account)
             sales_order.append(
                 "items",
                 {
@@ -1179,7 +1134,6 @@ def get_shopify_location():
 
     response = json.loads(raw_request_body.decode("utf-8"))
     if settings_for_secret.sync_location:
-        print("\n\n\n\nresponse", response)
 
         if not response:
             frappe.log_error("No locations found.")

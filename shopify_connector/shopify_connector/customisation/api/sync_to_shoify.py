@@ -407,9 +407,6 @@ def delete_customer_from_shopify(doc, method):
 
 
 
-
-
-
 def get_current_domain_name() -> str:
 
     if hasattr(frappe.local, 'request') and frappe.local.request:

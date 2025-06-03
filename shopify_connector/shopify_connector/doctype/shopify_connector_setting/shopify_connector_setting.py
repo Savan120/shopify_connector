@@ -638,6 +638,9 @@ def customer_creation():
                 cus_contact.flags.ignore_permissions = True
                 cus_contact.insert(ignore_mandatory=True)
                 cus_contact.save()
+                frappe.db.set_value("Customer", cus.name, "customer_primary_contact", cus_contact.name)
+                frappe.db.set_value("Customer", cus.name, "customer_primary_address", cus_address.name)
+                
 
 @frappe.whitelist()
 def product_creation():
