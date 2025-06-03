@@ -309,7 +309,6 @@ def customer_creation():
 
     shopify_hmac = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
 
-    # print("\n\n\n\n>>>>>>>>>>>>>.",shopify_hmac, "\n\n\n\n>>>>>>>>",shopify_webhook_secret.encode('utf-8'))
 
     if not shopify_hmac:
         frappe.throw("Unauthorized: Webhook signature missing.")
@@ -319,7 +318,6 @@ def customer_creation():
             shopify_webhook_secret.encode("utf-8"), request_body, hashlib.sha256
         ).digest()
     )
-    # print(calculated_hmac)
     if not hmac.compare_digest(calculated_hmac, shopify_hmac.encode("utf-8")):
         frappe.log_error(
             f"Webhook signature mismatch. Calculated: {calculated_hmac.decode('utf-8')}, Received: {shopify_hmac}",
@@ -341,11 +339,10 @@ def customer_creation():
             )
             frappe.throw("Invalid JSON payload.")
 
-        print(f"\n\n\n\n\n{order_data}\n\n\n\n")
 
         customer_id = order_data.get("id")
-        shop_url = "https://mysolufy.myshopify.com"
-        access_token = "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"
+        shop_url = shopify_keys.shop_url
+        access_token = shopify_keys.access_token
         shopify_url = f"{shop_url}/admin/api/2025-04/customers/{customer_id}.json"
 
         headers = {"X-Shopify-Access-Token": access_token}
