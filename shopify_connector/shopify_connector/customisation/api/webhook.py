@@ -347,21 +347,37 @@ def customer_creation():
         last_name_str = str(last_name) if last_name is not None else ""
 
         customer_name = f"{first_name_str} {last_name_str}".strip()
+        
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': f'{shopify_keys.access_token}',
+        }
 
-        # filters=or_(
-        # {"shopify_email": order_data.get("email")},
-        # {"shopify_id": order_data.get("shopify_id")}
-        # ),
+        json_data = {
+            'query': 'query getCustomerTags($id: ID!) { customer(id: $id) { id tags } }',
+            'variables': {
+                'id': f'gid://shopify/Customer/{customer_id}',
+            },
+        }
+
+        response = requests.post(f'https://{shopify_keys.shop_url}/admin/api/{shopify_keys.shopify_api_version}/graphql.json', headers=headers, json=json_data)
+        response_data = response.json()
+        tag = ""
+        tag = response_data["data"]["customer"]["tags"][0]
+        
+        if not tag:
+            tag = shopify_keys.customer_group
+            
 
         if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
-
             cus = frappe.new_doc("Customer")
             cus.flags.from_shopify = True
             cus.shopify_id = customer_id
             cus.shopify_email = order_data.get("email")
             cus.customer_name = customer_name
             cus.default_currency = order_data.get("currency")
-            cus.customer_group = tags
+            cus.customer_group = tag 
+            cus.territory = order_data.get("default_address").get("province")
             cus.flags.ignore_permissions = True
             cus.insert(ignore_mandatory=True)
             cus.save()
@@ -388,6 +404,7 @@ def customer_creation():
                 cus_address.save()
                 cus.customer_primary_address = cus_address.name
                 cus.save()
+                
         
             address = order_data.get("default_address")
             cus_contact = frappe.new_doc("Contact")
@@ -472,6 +489,7 @@ def product_creation():
             frappe.throw("Invalid JSON payload.")
 
         product_id = order_data.get("id")
+        print(order_data)
         inventory_item_id = None
         for v in order_data.get("variants", []):
             inventory_item_id = v.get("inventory_item_id")
@@ -496,12 +514,25 @@ def product_creation():
         if frappe.db.exists("Item", {"shopify_id": product_id}):
             return "Product already exists."
 
+        item_group = ""
+        if order_data.get("product_type"):
+            item_type_from_shopify = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
+            if not item_type_from_shopify:
+                item_type = frappe.new_doc("Item Group")
+                item_type.item_group_name = order_data.get("product_type")
+                item_type.flags.ignore_permissions = True
+                item_type.insert(ignore_permissions=True)
+                
+                item_group = item_type.name
+        else:
+            item_group = shopify_keys.item_group
+            
         item = frappe.new_doc("Item")
         item.item_code = order_data.get("title")
         item.item_name = order_data.get("title")
         item.gst_hsn_code = hsn_code_shopify
         item.description = order_data.get("body_html")
-        item.item_group = _("Shopify Products", sys_lang)
+        item.item_group = item_group
         item.stock_uom = settings.uom
         item.shopify_id = product_id
         item.custom_inventory_item_id = inventory_item_id
@@ -565,13 +596,26 @@ def product_creation():
         item.flags.from_shopify = True
         item.insert(ignore_mandatory=True)
         item.save()
+        
+        item_group = ""
+        if order_data.get("product_type"):
+            item_type_from_shopify = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
+            if not item_type_from_shopify:
+                item_type = frappe.new_doc("Item Group")
+                item_type.item_group_name = order_data.get("product_type")
+                item_type.flags.ignore_permissions = True
+                item_type.insert(ignore_permissions=True)
+                
+                item_group = item_type.name
+        else:
+            item_group = shopify_keys.item_group
 
         if item.has_variants:
             for v in order_data.get("variants", []):
                 variant = frappe.new_doc("Item")
                 variant.item_code = order_data.get("title") +"-"+ v.get("title")
                 variant.item_name = order_data.get("title") +"-"+ v.get("title")
-                variant.item_group = _("Shopify Products", sys_lang)
+                variant.item_group = item_group
                 variant.variant_of = item.name
                 variant.stock_uom = item.stock_uom
                 variant.custom_send_to_shopify = 1
@@ -631,7 +675,6 @@ def product_update():
     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
     settings_for_secret = frappe.get_single("Shopify Connector Setting")
     try:
-        s
         shopify_webhook_secret = settings_for_secret.shopify_webhook_secret
 
         if not shopify_webhook_secret:
