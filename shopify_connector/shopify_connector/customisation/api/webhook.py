@@ -664,6 +664,7 @@ def product_creation():
 
         return "Product created with variants and HSN."
     else:
+        frappe.log_error(title="Shopify Order Sync Error", message=frappe.get_traceback())
         return "Product sync is disabled in Shopify Connector Setting."
 
 

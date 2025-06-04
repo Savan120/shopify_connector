@@ -102,7 +102,7 @@ def send_customer_to_shopify_hook(doc, method):
         
 
             if response.status_code not in (200, 201):
-                frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
+                frappe.log_error(frappe.get_traceback(), "Shopify Order Sync Error")
             else:
                 print(response.json())
                 shopify_id = response.json()["customer"]["id"]
