@@ -30,9 +30,9 @@ class ShopifyConnectorSetting(Document):
     def validate(self):
         if self.enable_shopify:
             setup_custom_fields()
-            product_creation()
+            # product_creation()
             customer_creation() 
-            get_shopify_location()
+            # get_shopify_location()
             # create_delete_custom_fields(self)
             # get_order() 
 
@@ -461,18 +461,8 @@ def customer_creation():
     order_data = response.json()
             
     customer_data = order_data.get("customers", [])
-    for order_data in customer_data:
-        customers_group = ""
-        if order_data.get("tags"):
-            get_customer_group = frappe.db.get_value("Customer Group", {"customer_group_name": order_data.get("tags")})
-            if not get_customer_group:
-                customer_group = frappe.new_doc("Customer Group")
-                customer_group.customer_group_name = order_data.get("tags")
-                customer_group.flags.ignore_permissions = True
-                customer_group.insert(ignore_mandatory=True)
-                customer_group.save()
-                customers_group = customer_group.name
-
+    for order_data in customer_data:        
+        customers_group = shopify_keys.customer_group
         first_name = order_data.get("first_name")
         last_name = order_data.get("last_name")
         
@@ -490,20 +480,26 @@ def customer_creation():
             cus.customer_name = customer_name
             cus.customer_group = order_data.get("tags") or customers_group
             cus.default_currency = order_data.get("currency")
+            
             cus.flags.ignore_permissions = True
             cus.insert(ignore_mandatory=True)
+            cus.save() 
+            if frappe.db.exists("Territory", order_data.get("default_address", {}).get("province")):
+                cus.territory = order_data.get("default_address", {}).get("province")
+            else:
+                cus.territory = shopify_keys.territory 
             cus.save()
-
-            if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
-                address = order_data.get("default_address")
+            
+            default_address = order_data.get("default_address")
+            if default_address and default_address.get("province") and default_address.get("zip"):
                 cus_address = frappe.new_doc("Address")
                 cus_address.address_type = "Shipping"
-                cus_address.address_line1 = address.get("address1")
-                cus_address.address_line2 = address.get("address2")
-                cus_address.city = address.get("city")
-                cus_address.state = address.get("province")  
-                cus_address.country = address.get("country")
-                cus_address.postal_code = address.get("zip")
+                cus_address.address_line1 = default_address.get("address1")
+                cus_address.address_line2 = default_address.get("address2")
+                cus_address.city = default_address.get("city")
+                cus_address.state = default_address.get("province")  
+                cus_address.country = default_address.get("country")
+                cus_address.postal_code = default_address.get("zip")
                 cus_address.append(
                     "links",
                     {
@@ -516,18 +512,17 @@ def customer_creation():
                 cus_address.save()
                 frappe.db.set_value("Customer", cus.name, "customer_primary_address", cus_address.name)
 
-            address = order_data.get("default_address")
             cus_contact = frappe.new_doc("Contact")
-            cus_contact.first_name = address.get("first_name")
-            cus_contact.middle_name = address.get("middle_name") or ""
-            cus_contact.last_name = address.get("last_name")
-            cus_contact.append(
-                "email_ids",
-                {
-                    "email_id": order_data.get("email"),
-                    "is_primary": 1,
-                },
-            )
+            cus_contact.first_name = order_data.get("first_name")
+            cus_contact.middle_name = order_data.get("middle_name") or ""
+            cus_contact.last_name = order_data.get("last_name")
+            # cus_contact.append(
+            #     "email_ids",
+            #     {
+            #         "email_id": order_data.get("email"),
+            #         "is_primary": 1,
+            #     },
+            # )
             cus_contact.append(
                 "phone_nos",
                 {
@@ -544,7 +539,7 @@ def customer_creation():
                 },
             )
             cus_contact.flags.ignore_permissions = True
-            cus_contact.insert(ignore_mandatory=True)
+            cus_contact.insert(ignore_permissions=True)
             cus_contact.save()
             frappe.db.set_value("Customer", cus.name, "customer_primary_contact", cus_contact.name)
             
@@ -570,7 +565,6 @@ def product_creation():
         frappe.throw(f"Failed to fetch product data: {response.text}")
 
     data = response.json()
-    print(f"\n\n\n\n\n{data}\n\n\n")
 
     for order_data in data.get("products", []):
         product_id = order_data.get("id")
@@ -595,6 +589,19 @@ def product_creation():
 
         if order_data.get("status") == "draft":
             status = True
+        
+        item_group = ""
+        if order_data.get("product_type"):
+            item_type_from_shopify = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
+            if not item_type_from_shopify:
+                item_type = frappe.new_doc("Item Group")
+                item_type.item_group_name = order_data.get("product_type")
+                item_type.flags.ignore_permissions = True
+                item_type.insert(ignore_permissions=True)
+                
+                item_group = item_type.name
+        else:
+            item_group = shopify_keys.item_group
 
         if frappe.db.exists("Item", {"shopify_id": product_id}):
             continue
@@ -604,7 +611,7 @@ def product_creation():
         item.item_name = order_data.get("title")
         item.gst_hsn_code = hsn_code_shopify
         item.description = order_data.get("body_html")
-        item.item_group = _("Shopify Products", sys_lang)
+        item.item_group = item_group
         item.stock_uom = settings.uom
         item.shopify_id = product_id
         item.custom_inventory_item_id = inventory_item_id

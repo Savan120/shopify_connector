@@ -11,7 +11,6 @@ def send_customer_to_shopify_hook_delayed(doc):
     send_customer_to_shopify_hook(doc, "after_insert") 
 
 def send_customer_to_shopify_hook(doc, method):
-    print(">>>>>>>>>>>")
     if getattr(doc.flags, "from_shopify", True):
         return
     shopify_keys = frappe.get_single("Shopify Connector Setting")

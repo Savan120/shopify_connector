@@ -339,7 +339,6 @@ def customer_creation():
 
 
         customer_id = order_data.get("id")
-        tags = order_data.get("customer", {}).get("tags", "")
         first_name = order_data.get("first_name")
         last_name = order_data.get("last_name")
 
@@ -377,9 +376,13 @@ def customer_creation():
             cus.customer_name = customer_name
             cus.default_currency = order_data.get("currency")
             cus.customer_group = tag 
-            cus.territory = order_data.get("default_address").get("province")
             cus.flags.ignore_permissions = True
             cus.insert(ignore_mandatory=True)
+            cus.save()
+            if frappe.db.exists("Territory", order_data.get("default_address", {}).get("province")):
+                cus.territory = order_data.get("default_address", {}).get("province")
+            else:
+                cus.territory = shopify_keys.territory 
             cus.save()
             if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
                 address = order_data.get("default_address")
