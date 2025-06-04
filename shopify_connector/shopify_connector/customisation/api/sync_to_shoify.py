@@ -516,7 +516,6 @@ def send_item_to_shopify(doc, method):
 
             values = [attr_dict.get(attr) for attr in attribute_order]
             values += [None] * (3 - len(values))
-
             variant_data = {
                 "option1": values[0],
                 "option2": values[1],
@@ -611,10 +610,6 @@ def send_item_to_shopify(doc, method):
                     except Exception as e:
                         frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku}: {str(e)}", "Shopify Sync")
                         doc.flags.from_shopify = True
-
-        if response.status_code not in (200, 201):
-            frappe.log_error(f"Shopify product/variant sync failed: {response.text}", "Shopify Sync Error")
-            return
 
 
 

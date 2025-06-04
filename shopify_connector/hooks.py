@@ -124,9 +124,9 @@ doctype_js = {"Address" : "shopify_connector/customisation/address/address.js"}
 
 doc_events = {
     "Customer": {
-        "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.enqueue_send_customer_to_shopify",
-        "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
-        "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_customer_from_shopify",
+        # "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.enqueue_send_customer_to_shopify",
+        # "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
+        # "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_customer_from_shopify",
     },
     "Item": {
         "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
