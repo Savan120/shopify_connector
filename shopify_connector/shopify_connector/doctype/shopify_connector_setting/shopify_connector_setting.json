@@ -1,0 +1,231 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "SC.#####",
+ "creation": "2024-02-20 10:36:24.402550",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_shopify",
+  "api_key",
+  "api_secret",
+  "access_token",
+  "shop_url",
+  "shopify_api_version",
+  "uom",
+  "sales_order_series",
+  "column_break_suda",
+  "company",
+  "delivery_after_days",
+  "warehouse",
+  "tax_account",
+  "f_n_f_account",
+  "shopify_webhook_secret",
+  "webhook_session_user",
+  "erpnext_to_shopify_section",
+  "sync_customer",
+  "sync_product",
+  "sync_location",
+  "column_break_tqvw",
+  "sync_orders",
+  "sync_invoices",
+  "section_break_rvjk",
+  "item_group",
+  "customer_group",
+  "column_break_icri",
+  "territory"
+ ],
+ "fields": [
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Data",
+   "label": "API Key",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "fieldname": "api_secret",
+   "fieldtype": "Data",
+   "label": "API Secret",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "fieldname": "access_token",
+   "fieldtype": "Data",
+   "label": "Access Token",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "fieldname": "shop_url",
+   "fieldtype": "Data",
+   "label": "Shop URL",
+   "mandatory_depends_on": "eval:doc.enable_shopify"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_shopify",
+   "fieldtype": "Check",
+   "label": "Enable Shopify"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "sales_order_series",
+   "fieldtype": "Select",
+   "label": "Sales Order Series",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "SAL-ORD-.YYYY.-"
+  },
+  {
+   "fieldname": "column_break_suda",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Company"
+  },
+  {
+   "fieldname": "delivery_after_days",
+   "fieldtype": "Int",
+   "label": "Delivery After (Days)",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Company"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "tax_account",
+   "fieldtype": "Link",
+   "label": "Tax Account",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Account"
+  },
+  {
+   "fieldname": "f_n_f_account",
+   "fieldtype": "Link",
+   "label": "Freight and Forwarding Account",
+   "mandatory_depends_on": "eval:doc.enable_shopify",
+   "options": "Account"
+  },
+  {
+   "fieldname": "erpnext_to_shopify_section",
+   "fieldtype": "Section Break",
+   "label": "ERPNext To Shopify"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_customer",
+   "fieldtype": "Check",
+   "label": "Sync Customer"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_product",
+   "fieldtype": "Check",
+   "label": "Sync Product"
+  },
+  {
+   "fieldname": "column_break_tqvw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_orders",
+   "fieldtype": "Check",
+   "label": "Sync Orders"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_invoices",
+   "fieldtype": "Check",
+   "label": "Sync Invoices"
+  },
+  {
+   "fieldname": "shopify_api_version",
+   "fieldtype": "Data",
+   "label": "Shopify API Version"
+  },
+  {
+   "default": "0",
+   "fieldname": "sync_location",
+   "fieldtype": "Check",
+   "label": "Sync Location"
+  },
+  {
+   "fieldname": "shopify_webhook_secret",
+   "fieldtype": "Data",
+   "label": "Shopify Webhook Secret Key"
+  },
+  {
+   "fieldname": "webhook_session_user",
+   "fieldtype": "Link",
+   "label": "Webhook Session User",
+   "options": "User"
+  },
+  {
+   "fieldname": "section_break_rvjk",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "customer_group",
+   "fieldtype": "Link",
+   "label": "Customer Group",
+   "options": "Customer Group"
+  },
+  {
+   "fieldname": "column_break_icri",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Link",
+   "label": "Territory",
+   "options": "Territory"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-06-04 15:13:27.198730",
+ "modified_by": "Administrator",
+ "module": "Shopify Connector",
+ "name": "Shopify Connector Setting",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

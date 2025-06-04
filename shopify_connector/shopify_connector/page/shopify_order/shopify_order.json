@@ -1,0 +1,23 @@
+{
+ "content": null,
+ "creation": "2024-03-19 10:57:52.991667",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2024-03-19 11:56:03.867536",
+ "modified_by": "Administrator",
+ "module": "Shopify Connector",
+ "name": "shopify-order",
+ "owner": "Administrator",
+ "page_name": "shopify-order",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 1,
+ "title": "Shopify Order"
+}
