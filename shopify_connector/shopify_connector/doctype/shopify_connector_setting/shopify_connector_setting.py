@@ -30,14 +30,11 @@ class ShopifyConnectorSetting(Document):
     def validate(self):
         if self.enable_shopify:
             setup_custom_fields()
-            # create_delete_custom_fields(self)
-            # product_creation()
+            product_creation()
             customer_creation() 
+            get_shopify_location()
+            # create_delete_custom_fields(self)
             # get_order() 
-            # get_shopify_location()
-            # sync_shopify_products_to_erpnext()
-            # get_inv_level()
-            # get_inventory_levels_for_all_items()
 
 
 
@@ -500,7 +497,6 @@ def customer_creation():
             if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
                 address = order_data.get("default_address")
                 cus_address = frappe.new_doc("Address")
-                cus_address.address_title = cus.name
                 cus_address.address_type = "Shipping"
                 cus_address.address_line1 = address.get("address1")
                 cus_address.address_line2 = address.get("address2")

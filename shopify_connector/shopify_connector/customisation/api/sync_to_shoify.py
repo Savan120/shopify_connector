@@ -11,9 +11,9 @@ def send_customer_to_shopify_hook_delayed(doc):
     send_customer_to_shopify_hook(doc, "after_insert") 
 
 def send_customer_to_shopify_hook(doc, method):
+    print(">>>>>>>>>>>")
     if getattr(doc.flags, "from_shopify", True):
         return
-
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
@@ -82,6 +82,7 @@ def send_customer_to_shopify_hook(doc, method):
         customer_payload = {
             "customer": {
                 "first_name": doc.customer_name or "",
+                "last_name": "",
                 "email": email,
                 "phone": phone,
                 "addresses": address_list or [],
