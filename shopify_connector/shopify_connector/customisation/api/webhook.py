@@ -722,6 +722,12 @@ def product_update():
 
     if order_data.get("status") == "draft":
         status = True
+        
+    item_group = ""
+    if order_data.get("product_type"):
+            item_group = order_data.get("product_type")
+    else:
+        item_group = settings_for_secret.item_group
 
     item_doc = frappe.db.exists("Item", {"shopify_id": product_id})
     item = frappe.get_doc("Item", item_doc)
@@ -729,7 +735,7 @@ def product_update():
     item.item_name = order_data.get("title")
     item.gst_hsn_code = hsn_code_shopify
     item.description = order_data.get("body_html")
-    item.item_group = _("Shopify Products", sys_lang)
+    item.item_group = item_group
     item.stock_uom = settings.uom
     item.shopify_id = product_id
     item.custom_send_to_shopify = 1
