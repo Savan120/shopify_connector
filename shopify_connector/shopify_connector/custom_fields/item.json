@@ -5,7 +5,17 @@
    "fieldname": "custom_send_to_shopify",
    "fieldtype": "Check",
    "insert_after": "has_variants",
+   "is_system_generated": 1,
    "label": "Send to Shopify",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "shopify_selling_rate",
+   "fieldtype": "Currency",
+   "insert_after": "standard_rate",
+   "is_system_generated": 1,
+   "label": "Shopify Selling Rate",
    "module": "Shopify Connector"
   },
   {
@@ -16,15 +26,6 @@
    "label": "Shopify ID",
    "module": "Shopify Connector",
    "read_only": 1
-  },
-  {
-   "dt": "Item",
-   "fieldname": "shopify_selling_rate",
-   "fieldtype": "Currency",
-   "insert_after": "standard_rate",
-   "is_system_generated": 1,
-   "label": "Shopify Selling Rate",
-   "module": "Shopify Connector"
   },
   {
    "description": "You can search code by the description of the category.",
