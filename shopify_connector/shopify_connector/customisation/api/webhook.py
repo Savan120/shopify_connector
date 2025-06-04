@@ -1021,6 +1021,28 @@ def customer_update():
         frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
         
     shopify_id = order_data.get("id")
+    
+    headers = {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': f'{settings.access_token}',
+        }
+
+    json_data = {
+        'query': 'query getCustomerTags($id: ID!) { customer(id: $id) { id tags } }',
+        'variables': {
+            'id': f'gid://shopify/Customer/{shopify_id}',
+        },
+    }
+
+    response = requests.post(f'https://{settings.shop_url}/admin/api/{settings.shopify_api_version}/graphql.json', headers=headers, json=json_data)
+    response_data = response.json()
+    tag = ""
+    tag = response_data["data"]["customer"]["tags"][0]
+    
+    if not tag:
+        tag = settings.customer_group
+        
+        
     if not shopify_id:
         frappe.throw(_("Shopify customer ID is missing in the payload."))
 
@@ -1041,6 +1063,7 @@ def customer_update():
         
         customer.db_set("customer_name", customer_name)
         customer.db_set("shopify_email", order_data.get("email"))
+        customer.db_set("customer_group", tag)
         customer.db_set("default_currency", order_data.get("currency"))
         customer.save()
         
