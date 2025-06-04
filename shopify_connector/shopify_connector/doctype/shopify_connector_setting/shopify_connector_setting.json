@@ -30,7 +30,12 @@
   "sync_location",
   "column_break_tqvw",
   "sync_orders",
-  "sync_invoices"
+  "sync_invoices",
+  "section_break_ctwr",
+  "item_group",
+  "customer_group",
+  "column_break_zmid",
+  "territory"
  ],
  "fields": [
   {
@@ -170,12 +175,38 @@
    "fieldtype": "Link",
    "label": "Webhook Session User",
    "options": "User"
+  },
+  {
+   "fieldname": "section_break_ctwr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "customer_group",
+   "fieldtype": "Link",
+   "label": "Customer Group",
+   "options": "Customer Group"
+  },
+  {
+   "fieldname": "column_break_zmid",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Link",
+   "label": "Territory",
+   "options": "Territory"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-04 11:54:42.516492",
+ "modified": "2025-06-04 18:24:04.086495",
  "modified_by": "Administrator",
  "module": "Shopify Connector",
  "name": "Shopify Connector Setting",

@@ -363,6 +363,12 @@ def customer_creation():
         response_data = response.json()
         tag = ""
         tag = response_data["data"]["customer"]["tags"][0]
+        if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
+            customer_group = frappe.new_doc("Customer Group")
+            customer_group.customer_group_name = tag
+            customer_group.flags.ignore_permissions = True
+            customer_group.insert(ignore_permissions=True)
+            tag = customer_group.name
         
         if not tag:
             tag = shopify_keys.customer_group
@@ -696,7 +702,7 @@ def product_update():
     item_code = ""
     for v in order_data.get("variants", []):
         item_code = v.get("sku")
-        inventory_item_id = v.get("inventory_item_id")
+        invcustomer_groupentory_item_id = v.get("inventory_item_id")
 
     sys_lang = frappe.get_single("System Settings").language or "en"
     settings = frappe.get_doc("Shopify Connector Setting")
