@@ -600,18 +600,6 @@ def product_creation():
         item.insert(ignore_mandatory=True)
         item.save()
         
-        item_group = ""
-        if order_data.get("product_type"):
-            item_type_from_shopify = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
-            if not item_type_from_shopify:
-                item_type = frappe.new_doc("Item Group")
-                item_type.item_group_name = order_data.get("product_type")
-                item_type.flags.ignore_permissions = True
-                item_type.insert(ignore_permissions=True)
-                
-                item_group = item_type.name
-        else:
-            item_group = shopify_keys.item_group
 
         if item.has_variants:
             for v in order_data.get("variants", []):
@@ -805,7 +793,7 @@ def product_update():
 
             variant.item_code = order_data.get("title") + "-" + v.get("title")
             variant.item_name = order_data.get("title") + "-" + v.get("title")
-            variant.item_group = _("Shopify Products", sys_lang)
+            variant.item_group = item_group
             variant.variant_of = item.name
             variant.custom_send_to_shopify = 1
             variant.stock_uom = item.stock_uom
