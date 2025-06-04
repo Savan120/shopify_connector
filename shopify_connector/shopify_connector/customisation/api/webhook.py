@@ -629,8 +629,9 @@ def product_creation():
 def product_update():
     raw_request_body = frappe.local.request.get_data()
     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+    settings_for_secret = frappe.get_single("Shopify Connector Setting")
     try:
-        settings_for_secret = frappe.get_single("Shopify Connector Setting")
+        s
         shopify_webhook_secret = settings_for_secret.shopify_webhook_secret
 
         if not shopify_webhook_secret:
@@ -933,8 +934,8 @@ def customer_update():
     raw_request_body = frappe.local.request.get_data()
     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
 
+    settings = frappe.get_single("Shopify Connector Setting")
     try:
-        settings = frappe.get_single("Shopify Connector Setting")
         shopify_webhook_secret = settings.shopify_webhook_secret
 
         if not shopify_webhook_secret:
@@ -980,7 +981,13 @@ def customer_update():
 
         customer.flags.ignore_permissions = True
         
-        customer.db_set("customer_name", f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}")
+        customer_name = ""
+        if order_data.get("first_name") or order_data.get("last_name"):
+            customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
+        if not order_data.get("last_name"):
+            customer_name = order_data.get("first_name")
+        
+        customer.db_set("customer_name", customer_name)
         customer.db_set("shopify_email", order_data.get("email"))
         customer.db_set("default_currency", order_data.get("currency"))
         customer.save()
