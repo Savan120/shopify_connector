@@ -471,7 +471,6 @@ def customer_creation():
         else:
             customer_name = first_name
             
-        print(first_name)
         if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
             cus = frappe.new_doc("Customer")
             cus.flags.from_shopify = True
@@ -569,7 +568,9 @@ def product_creation():
     for order_data in data.get("products", []):
         product_id = order_data.get("id")
         inventory_item_id = None
+        item_code = ""
         for v in order_data.get("variants", []):
+            item_code = v.get("sku")
             inventory_item_id = v.get("inventory_item_id")
 
         sys_lang = frappe.get_single("System Settings").language or "en"
@@ -607,7 +608,7 @@ def product_creation():
             continue
 
         item = frappe.new_doc("Item")
-        item.item_code = order_data.get("title")
+        item.item_code = item_code
         item.item_name = order_data.get("title")
         item.gst_hsn_code = hsn_code_shopify
         item.description = order_data.get("body_html")

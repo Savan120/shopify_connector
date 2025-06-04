@@ -494,7 +494,9 @@ def product_creation():
         product_id = order_data.get("id")
         print(order_data)
         inventory_item_id = None
+        item_code = ""
         for v in order_data.get("variants", []):
+            item_code = v.get("sku")
             inventory_item_id = v.get("inventory_item_id")
 
         sys_lang = frappe.get_single("System Settings").language or "en"
@@ -531,9 +533,9 @@ def product_creation():
             item_group = shopify_keys.item_group
             
         item = frappe.new_doc("Item")
-        item.item_code = order_data.get("title")
+        item.item_code = item_code
         item.item_name = order_data.get("title")
-        item.gst_hsn_code = hsn_code_shopify
+        item.gst_hsn_code = hsn_code_shopify or "902300"
         item.description = order_data.get("body_html")
         item.item_group = item_group
         item.stock_uom = settings.uom
@@ -691,7 +693,9 @@ def product_update():
         frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
     product_id = order_data.get("id")
     inventory_item_id = None
+    item_code = ""
     for v in order_data.get("variants", []):
+        item_code = v.get("sku")
         inventory_item_id = v.get("inventory_item_id")
 
     sys_lang = frappe.get_single("System Settings").language or "en"
@@ -719,7 +723,7 @@ def product_update():
 
     item_doc = frappe.db.exists("Item", {"shopify_id": product_id})
     item = frappe.get_doc("Item", item_doc)
-    item.item_code = order_data.get("title")
+    item.item_code = item_code
     item.item_name = order_data.get("title")
     item.gst_hsn_code = hsn_code_shopify
     item.description = order_data.get("body_html")
