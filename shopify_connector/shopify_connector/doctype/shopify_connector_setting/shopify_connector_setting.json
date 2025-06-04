@@ -35,7 +35,9 @@
   "item_group",
   "customer_group",
   "column_break_zmid",
-  "territory"
+  "territory",
+  "section_break_bvok",
+  "warehouse_setting"
  ],
  "fields": [
   {
@@ -201,12 +203,22 @@
    "fieldtype": "Link",
    "label": "Territory",
    "options": "Territory"
+  },
+  {
+   "fieldname": "section_break_bvok",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "warehouse_setting",
+   "fieldtype": "Table",
+   "label": "Warehouse Setting",
+   "options": "Shopify Warehouse Table"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-04 18:24:04.086495",
+ "modified": "2025-06-05 01:07:18.090233",
  "modified_by": "Administrator",
  "module": "Shopify Connector",
  "name": "Shopify Connector Setting",

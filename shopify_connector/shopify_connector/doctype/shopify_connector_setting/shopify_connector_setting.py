@@ -29,10 +29,11 @@ class ShopifyConnectorSetting(Document):
     
     def validate(self):
         if self.enable_shopify:
-            setup_custom_fields()
+            pass
+            # setup_custom_fields()
             # product_creation()
-            customer_creation() 
             # get_shopify_location()
+            # customer_creation() 
             # create_delete_custom_fields(self)
             # get_order() 
 
@@ -200,55 +201,53 @@ def create_delete_custom_fields(self):
         item_group.parent_item_group = get_root_of("Item Group")
         item_group.insert()
   
+@frappe.whitelist()
+def sync_shopify_locations():
+    import requests
 
-def get_shopify_location():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
-    SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
     SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
+
     headers = {
         "Content-Type": "application/json",
         "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
     }
-    url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
+
+    url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
 
     response = requests.get(url, headers=headers, verify=False)
 
     if response.status_code == 200:
         locations = response.json().get("locations", [])
+        print(">>>>>>>>>>>>>>>>>>>", locations)
 
         if not locations:
             frappe.log_error("No locations found.")
             return
 
+        existing_ids = {row.shopify_id for row in shopify_keys.warehouse_setting}
+        print("Existing IDs before:", existing_ids)
+
         for location in locations:
-            disabled = not location.get("active", True)
-            shopify_id = location.get("id")
+            shopify_id = str(location.get("id"))
             warehouse_name = location.get("name")
 
+            if shopify_id not in existing_ids:
+                shopify_keys.append("warehouse_setting", {
+                    "shopify_id": shopify_id,
+                    "shopify_warehouse": warehouse_name
+                })
+                existing_ids.add(shopify_id)
 
-            warehouse_existing = frappe.db.get_value("Warehouse", {"custom_shopify_id": shopify_id}, "name")
-            if warehouse_existing:
-                warehouse = frappe.get_doc("Warehouse", warehouse_existing)
-
-            else:
-                warehouse = frappe.new_doc("Warehouse")
-            warehouse.warehouse_name = warehouse_name
-            warehouse.address_line_1 = location.get("address1")
-            warehouse.address_line_2 = location.get("address2")
-            warehouse.city = location.get("city")
-            warehouse.state = location.get("province")
-            warehouse.custom_country = location.get("country_name")
-            warehouse.pin = location.get("zip")
-            warehouse.phone_no = location.get("phone")
-            warehouse.custom_shopify_id = shopify_id
-            warehouse.disabled = disabled
-            warehouse.flags.ignore_shopify_sync = True
-            warehouse.save()
+        shopify_keys.save()
+        return {"status": "success", "message": "Locations synced"}
 
     else:
         frappe.log_error("Failed to fetch locations from Shopify")
+        frappe.throw("Shopify API Error")
+
 
 
 def get_order():
@@ -461,8 +460,20 @@ def customer_creation():
     order_data = response.json()
             
     customer_data = order_data.get("customers", [])
-    for order_data in customer_data:        
-        customers_group = shopify_keys.customer_group
+    for order_data in customer_data:    
+        # tag = ""
+        # if not frappe.db.exists("Customer Group", {"customer_group_name": order_data.get("tags")}):
+        #     customer_group = frappe.new_doc("Customer Group")
+        #     customer_group.name = tag
+        #     customer_group.customer_group_name = tag
+        #     customer_group.flags.ignore_permissions = True
+        #     print(customer_group.__dict__)
+        #     customer_group.insert(ignore_permissions=True)
+
+        #     tag = customer_group.name
+        
+        # if not tag:
+        #     tag = shopify_keys.customer_group    
         first_name = order_data.get("first_name")
         last_name = order_data.get("last_name")
         
@@ -477,9 +488,8 @@ def customer_creation():
             cus.shopify_email = order_data.get("email")
             cus.shopify_id = order_data.get("id")
             cus.customer_name = customer_name
-            cus.customer_group = order_data.get("tags") or customers_group
+            cus.customer_group = shopify_keys.customer_group or tag
             cus.default_currency = order_data.get("currency")
-            
             cus.flags.ignore_permissions = True
             cus.insert(ignore_mandatory=True)
             cus.save() 
@@ -515,21 +525,23 @@ def customer_creation():
             cus_contact.first_name = order_data.get("first_name")
             cus_contact.middle_name = order_data.get("middle_name") or ""
             cus_contact.last_name = order_data.get("last_name")
-            # cus_contact.append(
-            #     "email_ids",
-            #     {
-            #         "email_id": order_data.get("email"),
-            #         "is_primary": 1,
-            #     },
-            # )
-            cus_contact.append(
-                "phone_nos",
-                {
-                    "phone": order_data.get("phone"),
-                    "is_primary_phone": 1,
-                    "is_primary_mobile_no":1
-                },
-            )
+            if order_data.get("email"):
+                cus_contact.append(
+                    "email_ids",
+                    {
+                        "email_id": order_data.get("email"),
+                        "is_primary": 1,
+                    },
+                )
+            if order_data.get("phone"):
+                cus_contact.append(
+                    "phone_nos",
+                    {
+                        "phone": order_data.get("phone"),
+                        "is_primary_phone": 1,
+                        "is_primary_mobile_no":1
+                    },
+                )
             cus_contact.append(
                 "links",
                 {
