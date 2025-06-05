@@ -29,7 +29,6 @@ def send_customer_to_shopify_hook(doc, method):
             "link_name": doc.name,
             "parenttype": "Address"
         }, fields=["parent"])
-        
 
         if not address_links and doc.customer_name != doc.name:
             address_links = frappe.get_all("Dynamic Link", filters={
@@ -71,10 +70,10 @@ def send_customer_to_shopify_hook(doc, method):
                 "phone": primary_address.phone,
                 "email": primary_address.email_id
             })
-        
+            
         if phone == "":
             phone = doc.mobile_no
-        
+
         if email == "":
             email = doc.email_id
 
@@ -85,7 +84,7 @@ def send_customer_to_shopify_hook(doc, method):
                 "email": email,
                 "phone": phone,
                 "addresses": address_list or [],
-                "tags":doc.customer_group or ""
+                "tags": doc.customer_group or ""
             }
         }
 
@@ -99,17 +98,34 @@ def send_customer_to_shopify_hook(doc, method):
             else:
                 url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers.json"
                 response = requests.post(url, json=customer_payload, verify=False)
-        
 
             if response.status_code not in (200, 201):
                 frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
             else:
-                print(response.json())
-                shopify_id = response.json()["customer"]["id"]
-                shopify_email = response.json()["customer"]["email"]
+                shopify_customer = response.json().get("customer", {})
+                shopify_id = shopify_customer.get("id")
+                shopify_email = shopify_customer.get("email")
+                shopify_addresses = shopify_customer.get("addresses", [])
+
                 doc.flags.from_shopify = True
-                doc.db_set("shopify_id",shopify_id)
-                doc.db_set("shopify_email",shopify_email)
+                doc.db_set("shopify_id", shopify_id)
+                doc.db_set("shopify_email", shopify_email)
+
+                for shopify_address in shopify_addresses:
+                    matching_address = None
+                    for link in address_links:
+                        local_address = frappe.get_doc("Address", link["parent"])
+                        if (local_address.address_line1 == shopify_address.get("address1") and
+                            local_address.city == shopify_address.get("city") and
+                            local_address.pincode == shopify_address.get("zip")):
+                            matching_address = local_address
+                            break
+
+                    if matching_address:
+                        if not matching_address.shopify_id:
+                            matching_address.db_set("shopify_id", shopify_address.get("id"))
+                    elif not address_links:
+                        primary_address.db_set("shopify_id", shopify_address.get("id"))
 
         except Exception as e:
             frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
@@ -286,7 +302,6 @@ def send_item_to_shopify(doc, method):
             })
 
     elif not item.has_variants:
-        print("Simple product processing")
         product_payload = {
             "product": {
                 "title": item.item_name,
@@ -317,13 +332,10 @@ def send_item_to_shopify(doc, method):
         if product_shopify_id_to_update:
             url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"
             response = requests.put(url, json=product_payload, verify=False)
-            print("Updating existing product/variants")
             doc.flags.from_shopify = True
         else: 
             url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
             response = requests.post(url, json=product_payload, verify=False)
-            print(response.json())
-            print("Creating new product")
 
         if response.status_code == 201:
             shopify_product = response.json()["product"]
@@ -394,7 +406,6 @@ def get_country_code(country_name):
     name_clean = clean_name(country_name)
     
     for country in pycountry.countries:
-        # print("\n\n\ncountry",country)
         if clean_name(country.name) == name_clean:
             return country.alpha_2
     return None
@@ -402,18 +413,14 @@ def get_country_code(country_name):
 
 def get_country_and_state_codes(country_name, state_name):
     country_code = get_country_code(country_name)
-    # print("\n\n\ncountry_code",country_code)
     if not country_code:
         return None, None
 
     state_clean = clean_name(state_name)
 
     for subdiv in pycountry.subdivisions.get(country_code=country_code):
-        # print("\n\n\nsubdiv",subdiv)
         if state_clean in clean_name(subdiv.name):
-            # print("\n\n\nstate_clean",state_clean)
             state_code = subdiv.code.split('-')[-1]  
-            # print("\n\nstate_code",state_code)
             return country_code, state_code
     else:
         return frappe.throw(f"{state_name} not found in {country_name}")
@@ -797,15 +804,12 @@ def create_shopify_draft_order(doc, method):
         headers=headers,
         json={"query": query, "variables": variables}
     )
-    print(f"\n\n\n\n\n{response}\n\n\n\n")
 
     if response.status_code != 200 or "errors" in response.json():
         frappe.log_error("Shopify Draft Order Creation Failed", response.text)
         return
     abc=response.json().get("data", {})
-    print(f"\n\n\n\n{abc}\n\n\n\n")
     draft_order = response.json().get("data", {}).get("draftOrderCreate", {}).get("draftOrder")
-    print(f"\n\n\n\n\n{draft_order}\n\n\n\n")
     if draft_order and draft_order.get("id"):
         doc.custom_shopify_draft_order_id = draft_order["id"].split("/")[-1]
         doc.flags.from_shopify = True

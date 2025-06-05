@@ -9,7 +9,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.utils.nestedset import get_root_of
 from frappe.utils import cstr
 import datetime
-
+from frappe.utils.background_jobs import enqueue
 from frappe.utils import flt
 from frappe.utils import cint, cstr, getdate, nowdate
 
@@ -28,14 +28,13 @@ from shopify_connector.shopify_connector.constants import (
 class ShopifyConnectorSetting(Document):
     
     def validate(self):
-        if self.enable_shopify:
-            pass
-            # setup_custom_fields()
+        if self.enable_shopify and not self.flags.ignore_validate:
+            setup_custom_fields()
             # product_creation()
-            # get_shopify_location()
-            # customer_creation() 
+            customer_creation() 
+            # enqueue_get_order_from_shopify() 
+            sync_shopify_locations()
             # create_delete_custom_fields(self)
-            # get_order() 
 
 
 
@@ -201,10 +200,7 @@ def create_delete_custom_fields(self):
         item_group.parent_item_group = get_root_of("Item Group")
         item_group.insert()
   
-@frappe.whitelist()
 def sync_shopify_locations():
-    import requests
-
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
@@ -218,10 +214,9 @@ def sync_shopify_locations():
     url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
 
     response = requests.get(url, headers=headers, verify=False)
-
+    print(response.json())
     if response.status_code == 200:
         locations = response.json().get("locations", [])
-        print(">>>>>>>>>>>>>>>>>>>", locations)
 
         if not locations:
             frappe.log_error("No locations found.")
@@ -239,9 +234,13 @@ def sync_shopify_locations():
                     "shopify_id": shopify_id,
                     "shopify_warehouse": warehouse_name
                 })
+                
                 existing_ids.add(shopify_id)
-
+        shopify_keys.flags.ignore_validate = True
+        print(">>>>>>>>>>>")
         shopify_keys.save()
+        
+        print("(****************8)", len(shopify_keys.warehouse_setting))
         return {"status": "success", "message": "Locations synced"}
 
     else:
@@ -249,8 +248,10 @@ def sync_shopify_locations():
         frappe.throw("Shopify API Error")
 
 
+def enqueue_get_order_from_shopify():
+    enqueue("shopify_connector.shopify_connector.doctype.shopify_connector_setting.shopify_connector_setting.get_sales_order", queue="default", timeout=400, enqueue_after_commit=True)
 
-def get_order():
+def get_sales_order():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
@@ -272,7 +273,6 @@ def get_order():
     orderdata = data.get("orders", [])
     # print("\n\n\n\n\n>>>>>>>>>>",order_data)
     for order_data in orderdata:
-        print(order_data) 
         try:
             settings = frappe.get_doc("Shopify Connector Setting")
             company_abbr = frappe.db.get_value("Company", settings.company, "abbr")
@@ -504,6 +504,7 @@ def customer_creation():
                 cus_address = frappe.new_doc("Address")
                 cus_address.address_type = "Shipping"
                 cus_address.address_line1 = default_address.get("address1")
+                cus_address.shopify_id = default_address.get("id")
                 cus_address.address_line2 = default_address.get("address2")
                 cus_address.city = default_address.get("city")
                 cus_address.state = default_address.get("province")  

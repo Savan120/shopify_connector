@@ -362,15 +362,15 @@ def customer_creation():
         response = requests.post(f'https://{shopify_keys.shop_url}/admin/api/{shopify_keys.shopify_api_version}/graphql.json', headers=headers, json=json_data)
         response_data = response.json()
         tag = ""
-        tag = response_data["data"]["customer"]["tags"][0]
-        if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
-            customer_group = frappe.new_doc("Customer Group")
-            customer_group.customer_group_name = tag
-            customer_group.flags.ignore_permissions = True
-            customer_group.insert(ignore_permissions=True)
-            tag = customer_group.name
-        
-        if not tag:
+        tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
+        if tags:
+            tag = tags[0]
+            if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
+                customer_group = frappe.new_doc("Customer Group")
+                customer_group.customer_group_name = tag
+                customer_group.flags.ignore_permissions = True
+                customer_group.insert(ignore_permissions=True)
+        else:
             tag = shopify_keys.customer_group
             
 
@@ -394,6 +394,7 @@ def customer_creation():
                 address = order_data.get("default_address")
                 cus_address = frappe.new_doc("Address")
                 cus_address.address_title = cus.customer_name
+                cus_address.shopify_id = address.get("id")
                 cus_address.address_type = "Shipping"
                 cus_address.address_line1 = address.get("address1")
                 cus_address.address_line2 = address.get("address2")
@@ -501,7 +502,6 @@ def product_creation():
             frappe.throw("Invalid JSON payload.")
 
         product_id = order_data.get("id")
-        print(order_data)
         inventory_item_id = None
         item_code = ""
         for v in order_data.get("variants", []):
@@ -1038,10 +1038,10 @@ def customer_update():
     response = requests.post(f'https://{settings.shop_url}/admin/api/{settings.shopify_api_version}/graphql.json', headers=headers, json=json_data)
     response_data = response.json()
     tag = ""
-    tag = response_data["data"]["customer"]["tags"][0]
+    # tag = response_data["data"]["customer"]["tags"][0]
     
-    if not tag:
-        tag = settings.customer_group
+    # if not tag:
+    tag = settings.customer_group
         
         
     if not shopify_id:
@@ -1069,8 +1069,11 @@ def customer_update():
         customer.save()
         
         customer.flags.from_shopify = True
-        state = order_data.get("default_address").get("province") 
-        pincode = order_data.get("default_address").get("zip")
+        state = ""
+        pincode = ""
+        if order_data.get("default_address"):
+            state = order_data.get("default_address").get("province") 
+            pincode = order_data.get("default_address").get("zip")
         
         if state and pincode:
             
@@ -1078,12 +1081,23 @@ def customer_update():
             address = None
 
             if customer.customer_primary_address:
-                address = frappe.get_doc("Address", customer.customer_primary_address)
+                address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
+                address = frappe.get_doc("Address", address)
             
             if not address:
                 address = frappe.new_doc("Address")
+                address.shopify_id = address_data.get("id")
                 address.address_title = customer.name
                 address.address_type = "Shipping"
+                address.address_line1 = address_data.get("address1")
+                address.address_line2 = address_data.get("address2")
+                address.city = address_data.get("city")
+                address.state = address_data.get("province")
+                address.country = address_data.get("country")
+                address.pincode = address_data.get("zip")
+                address.phone = address_data.get("phone")
+                address.first_name = address_data.get("first_name")
+                address.last_name = address_data.get("last_name")
                 address.append("links", {
                     "link_doctype": "Customer",
                     "link_name": customer.name,
@@ -1091,6 +1105,7 @@ def customer_update():
 
             address.update({
                 "address_line1": address_data.get("address1"),
+                "address_type" : "Shipping",
                 "address_line2": address_data.get("address2"),
                 "city": address_data.get("city"),
                 "state": address_data.get("province"),
