@@ -27,13 +27,12 @@ from shopify_connector.shopify_connector.constants import (
 
 class ShopifyConnectorSetting(Document):
     
-    def validate(self):
+    def before_validate(self):
         if self.enable_shopify and not self.flags.ignore_validate:
             setup_custom_fields()
-            # product_creation()
+            product_creation()
             customer_creation() 
-            # enqueue_get_order_from_shopify() 
-            sync_shopify_locations()
+            enqueue_get_order_from_shopify() 
             # create_delete_custom_fields(self)
 
 
@@ -200,6 +199,7 @@ def create_delete_custom_fields(self):
         item_group.parent_item_group = get_root_of("Item Group")
         item_group.insert()
   
+@frappe.whitelist()
 def sync_shopify_locations():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
@@ -236,12 +236,9 @@ def sync_shopify_locations():
                 })
                 
                 existing_ids.add(shopify_id)
+        shopify_keys.delivery_after_days = 20
         shopify_keys.flags.ignore_validate = True
-        print(">>>>>>>>>>>")
         shopify_keys.save()
-        
-        print("(****************8)", len(shopify_keys.warehouse_setting))
-        return {"status": "success", "message": "Locations synced"}
 
     else:
         frappe.log_error("Failed to fetch locations from Shopify")

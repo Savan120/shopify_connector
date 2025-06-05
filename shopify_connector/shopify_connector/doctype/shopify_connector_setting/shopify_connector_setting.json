@@ -37,6 +37,7 @@
   "column_break_zmid",
   "territory",
   "section_break_bvok",
+  "fetch_location",
   "warehouse_setting"
  ],
  "fields": [
@@ -213,12 +214,17 @@
    "fieldtype": "Table",
    "label": "Warehouse Setting",
    "options": "Shopify Warehouse Table"
+  },
+  {
+   "fieldname": "fetch_location",
+   "fieldtype": "Button",
+   "label": "Fetch Location"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-05 01:07:18.090233",
+ "modified": "2025-06-05 14:58:08.068728",
  "modified_by": "Administrator",
  "module": "Shopify Connector",
  "name": "Shopify Connector Setting",

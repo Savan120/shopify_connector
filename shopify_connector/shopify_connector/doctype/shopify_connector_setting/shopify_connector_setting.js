@@ -22,16 +22,19 @@ frappe.ui.form.on('Shopify Connector Setting', {
         });
     },
 });
-// frappe.ui.form.on('Shopify Connector Setting', {
-//     validate: function (frm) {
-//         if (frm.doc.enable_shopify) {
-//             frappe.call({
-//                 method: "shopify_connector.shopify_connector.doctype.shopify_connector_setting.shopify_connector_setting.sync_shopify_locations",
-//                 callback: function (r) {
-//                     frm.reload_doc();
-//                 }
-//             });
-//         }
-//     }
-// });
+
+frappe.ui.form.on('Shopify Connector Setting', {
+    fetch_location: function(frm) {
+        frappe.call({
+            
+            method: 'shopify_connector.shopify_connector.doctype.shopify_connector_setting.shopify_connector_setting.sync_shopify_locations',
+            args: {
+                doc: frm.doc
+            },
+            callback: function(r) {
+                frm.reload_doc();
+            }
+        });
+    }
+});
 
