@@ -128,10 +128,10 @@ doc_events = {
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
         "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_customer_from_shopify",
     },
-    # "Address": {
-    #     "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.update_address_from_shopify",
-    #     "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_address_from_shopify",
-    # },
+    "Address": {
+        "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.on_address_update",
+        # "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_address_from_shopify",
+    },
     "Item": {
         "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
@@ -145,12 +145,10 @@ doc_events = {
         "on_update":[ "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.activate_deactivate_shopify_location",
                      "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.update_shopify_location"],
         "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_shopify_location",
-        
     },
     "Sales Order":{
         "after_insert":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_draft_order"
     }
-
 }
 
 

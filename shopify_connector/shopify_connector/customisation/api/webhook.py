@@ -361,6 +361,7 @@ def customer_creation():
 
         response = requests.post(f'https://{shopify_keys.shop_url}/admin/api/{shopify_keys.shopify_api_version}/graphql.json', headers=headers, json=json_data)
         response_data = response.json()
+        print(response_data)
         tag = ""
         tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
         if tags:
@@ -1208,7 +1209,8 @@ def customer_update():
     user = frappe.session.user = settings.webhook_session_user 
     if not user:
         frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
-        
+    
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>",order_data)
     shopify_id = order_data.get("id")
     
     headers = {
