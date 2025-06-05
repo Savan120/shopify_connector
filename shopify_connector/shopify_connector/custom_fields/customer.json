@@ -2,10 +2,26 @@
  "Customer": [
   {
    "dt": "Customer",
-   "fieldname": "shopify_email",
+   "fieldname": "custom_ignore_address_update",
+   "fieldtype": "Check",
+   "insert_after": "custom_column_break_l0hid",
+   "label": "Ignore Address Update",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_column_break_l0hid",
+   "fieldtype": "Column Break",
+   "insert_after": "shopify_id",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "shopify_customer_id",
    "fieldtype": "Data",
+   "insert_after": "series",
    "is_system_generated": 1,
-   "label": "Shopify Email",
+   "label": "Shopify Customer Id",
    "module": "Shopify Connector",
    "read_only": 1
   },
@@ -20,11 +36,10 @@
   },
   {
    "dt": "Customer",
-   "fieldname": "shopify_customer_id",
+   "fieldname": "shopify_email",
    "fieldtype": "Data",
-   "insert_after": "series",
    "is_system_generated": 1,
-   "label": "Shopify Customer Id",
+   "label": "Shopify Email",
    "module": "Shopify Connector",
    "read_only": 1
   },

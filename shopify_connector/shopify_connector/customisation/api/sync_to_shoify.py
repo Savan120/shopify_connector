@@ -12,7 +12,12 @@ def send_customer_to_shopify_hook_delayed(doc):
     
 
 def send_customer_to_shopify_hook(doc, method):
-    if getattr(doc.flags, "from_shopify", True):
+    print("||||||||||||||||||||||||||||||||||", doc.get("from_shopify"))
+    if doc.get("from_shopify"):
+        return
+
+    if doc.get("custom_ignore_address_update"):
+        doc.custom_ignore_address_update = False
         return
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")

@@ -1171,6 +1171,198 @@ def get_inventory_update():
 
 
 
+# @frappe.whitelist(allow_guest=True)
+# def customer_update():    
+#     raw_request_body = frappe.local.request.get_data()
+#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+
+#     settings = frappe.get_single("Shopify Connector Setting")
+#     try:
+#         shopify_webhook_secret = settings.shopify_webhook_secret
+
+#         if not shopify_webhook_secret:
+#             frappe.throw(
+#                 _("Webhook secret not configured. Please set it up in Shopify Connector Setting."),
+#                 frappe.ValidationError,
+#             )
+
+#         if not shopify_hmac_header:
+#             frappe.throw(_("Unauthorized: Webhook signature missing."), frappe.PermissionError)
+
+#         secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+#         calculated_hmac = base64.b64encode(
+#             hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
+#         ).decode()
+
+#         if not hmac.compare_digest(calculated_hmac, shopify_hmac_header):
+#             frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
+
+#     except Exception as e:
+#         frappe.throw(_(f"Webhook verification error: {e}"))
+
+#     try:
+#         order_data = frappe.parse_json(raw_request_body.decode("utf-8"))
+#     except Exception as e:
+#         frappe.log_error(f"Failed to parse JSON: {e}", "Shopify Webhook Error")
+#         frappe.throw(_("Invalid JSON payload."))
+
+#     user = frappe.session.user = settings.webhook_session_user 
+#     if not user:
+#         frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
+    
+#     shopify_id = order_data.get("id")
+    
+#     headers = {
+#             'Content-Type': 'application/json',
+#             'X-Shopify-Access-Token': f'{settings.access_token}',
+#         }
+
+#     json_data = {
+#         'query': 'query getCustomerTags($id: ID!) { customer(id: $id) { id tags } }',
+#         'variables': {
+#             'id': f'gid://shopify/Customer/{shopify_id}',
+#         },
+#     }
+
+#     response = requests.post(f'https://{settings.shop_url}/admin/api/{settings.shopify_api_version}/graphql.json', headers=headers, json=json_data)
+#     response_data = response.json()
+#     tag = ""
+#     tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
+#     if tags:
+#         tag = tags[0]
+#         if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
+#             customer_group = frappe.new_doc("Customer Group")
+#             customer_group.customer_group_name = tag
+#             customer_group.flags.ignore_permissions = True
+#             customer_group.insert(ignore_permissions=True)
+#     else:
+#         tag = settings.customer_group
+#     customer_name =  frappe.db.exists("Customer", {"shopify_id": shopify_id})
+#     customer_contact_address = frappe.db.get_value("Customer", {"customer_name": customer_name},["customer_primary_address", "customer_primary_contact"], as_dict=True)    
+#     state = ""
+#     pincode = ""
+#     if order_data.get("default_address"):
+#         state = order_data.get("default_address").get("province") 
+#         pincode = order_data.get("default_address").get("zip")
+
+#     if state and pincode:
+#         print("Address Started")
+#         address_data = order_data.get("default_address")
+#         address = None
+
+#         if customer_contact_address.customer_primary_address:
+#             address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
+#             address = frappe.get_doc("Address", address)
+#         print("1285 Started")
+#         if not address:
+#             address = frappe.new_doc("Address")
+#             address.shopify_id = address_data.get("id")
+#             address.address_title = customer.name
+#             address.address_type = "Shipping"
+#             address.address_line1 = address_data.get("address1")
+#             address.address_line2 = address_data.get("address2")
+#             address.city = address_data.get("city")
+#             address.state = address_data.get("province")
+#             address.country = address_data.get("country")
+#             address.pincode = address_data.get("zip")
+#             address.phone = address_data.get("phone")
+#             address.first_name = address_data.get("first_name")
+#             address.last_name = address_data.get("last_name")
+
+#         address.update({
+#             "address_line1": address_data.get("address1"),
+#             "address_type" : "Shipping",
+#             "address_line2": address_data.get("address2"),
+#             "city": address_data.get("city"),
+#             "state": address_data.get("province"),
+#             "country": address_data.get("country"),
+#             "pincode": address_data.get("zip"),
+#             "phone": address_data.get("phone"),
+#             "address_title": f"{address_data.get('first_name', '')} {address_data.get('last_name', '')}",
+#             "address_type": "Shipping"
+#         })
+#         address.flags.ignore_permissions = True
+#         address.save(ignore_permissions=True)
+
+#         contact = None
+#         if customer_contact_address.customer_primary_contact:
+#             contact = frappe.get_doc("Contact", customer_contact_address.customer_primary_contact)
+#         if not contact:
+#             contact = frappe.new_doc("Contact")
+#             contact.first_name = address_data.get("first_name")
+#             contact.middle_name = address_data.get("middle_name") or ""
+#             contact.last_name = address_data.get("last_name")
+#             if order_data.get("email"):
+#                 contact.append("email_ids", {
+#                     "email_id": order_data.get("email"),
+#                     "is_primary": 1,
+#                 })
+#             if order_data.get("phone"):
+#                 contact.append("phone_nos", {
+#                     "phone": order_data.get("phone"),
+#                     "is_primary_phone": 1,
+#                 })
+#             contact.flags.ignore_permissions = True
+#             contact.save(ignore_permissions=True)
+#             customer.customer_primary_contact = contact.name
+#         else:
+#             contact.update({
+#                 "first_name": address_data.get("first_name"),
+#                 "middle_name": address_data.get("middle_name") or "",
+#                 "last_name": address_data.get("last_name")
+#             })
+#             if order_data.get("email"):
+#                 contact.set("email_ids", [{
+#                     "email_id": order_data.get("email"),
+#                     "is_primary": 1
+#                 }])
+#             if order_data.get("phone"):
+#                 contact.set("phone_nos", [{
+#                     "phone": order_data.get("phone"),
+#                     "is_primary_phone": 1
+#                 }])
+#             contact.flags.ignore_permissions = True
+#             contact.save()
+    
+
+#         if frappe.db.exists("Customer", {"shopify_id": shopify_id}):
+#             customer = frappe.get_doc("Customer", {"shopify_id": shopify_id})
+
+#             if not customer:
+#                 frappe.msgprint(_("Customer not found with Shopify ID."))
+#                 return
+
+#             customer.flags.ignore_permissions = True
+            
+#             customer_name = ""
+#             if order_data.get("first_name") or order_data.get("last_name"):
+#                 customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
+#             if not order_data.get("last_name"):
+#                 customer_name = order_data.get("first_name")
+#             customer.customer_name = customer_name
+#             customer.shopify_email = order_data.get("email")
+#             customer.customer_group = tag
+#             customer.default_currency = order_data.get("currency")
+#             customer.from_shopify = True
+#             customer.save()
+#             print("===========================>", customer.from_shopify)
+#             print("Contact Saved")
+#             frappe.msgprint(_("Customer updated fo  r email: {0}").format(order_data.get("email")))
+#         print("COMPLETED")
+#     else:
+#         frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
+
+
+
+
+
+
+
+
+
+
+
+
 @frappe.whitelist(allow_guest=True)
 def customer_update():
     raw_request_body = frappe.local.request.get_data()
@@ -1210,7 +1402,6 @@ def customer_update():
     if not user:
         frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
     
-    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>",order_data)
     shopify_id = order_data.get("id")
     
     headers = {
@@ -1257,29 +1448,29 @@ def customer_update():
             customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
         if not order_data.get("last_name"):
             customer_name = order_data.get("first_name")
-        
-        customer.db_set("customer_name", customer_name)
-        customer.db_set("shopify_email", order_data.get("email"))
-        customer.db_set("customer_group", tag)
-        customer.db_set("default_currency", order_data.get("currency"))
+        customer.customer_name = customer_name
+        customer.shopify_email = order_data.get("email")
+        customer.customer_group = tag
+        customer.default_currency = order_data.get("currency")
+        customer.custom_ignore_address_update = True
+        customer.from_shopify = True
         customer.save()
-        
-        customer.flags.from_shopify = True
+        print("===========================>", customer.from_shopify)
         state = ""
         pincode = ""
         if order_data.get("default_address"):
             state = order_data.get("default_address").get("province") 
             pincode = order_data.get("default_address").get("zip")
-        
+
         if state and pincode:
-            
+            print("Address Started")
             address_data = order_data.get("default_address")
             address = None
 
             if customer.customer_primary_address:
                 address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
                 address = frappe.get_doc("Address", address)
-            
+            print("1285 Started")
             if not address:
                 address = frappe.new_doc("Address")
                 address.shopify_id = address_data.get("id")
@@ -1311,11 +1502,11 @@ def customer_update():
                 "address_title": f"{address_data.get('first_name', '')} {address_data.get('last_name', '')}",
                 "address_type": "Shipping"
             })
-            
             address.flags.ignore_permissions = True
+            print("1317 Started")
             address.save(ignore_permissions=True)
-
-            frappe.db.set_value("Customer", customer.name, "customer_primary_address", address.name)
+            print("Address Saved")
+            customer.customer_primary_address = address.name
 
             contact = None
             if customer.customer_primary_contact:
@@ -1342,7 +1533,7 @@ def customer_update():
                 })
                 contact.flags.ignore_permissions = True
                 contact.save(ignore_permissions=True)
-                frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
+                customer.customer_primary_contact = contact.name
             else:
                 contact.update({
                     "first_name": address_data.get("first_name"),
@@ -1361,10 +1552,21 @@ def customer_update():
                     }])
                 contact.flags.ignore_permissions = True
                 contact.save()
-
-            frappe.msgprint(_("Customer updated for email: {0}").format(order_data.get("email")))            
+            print("Contact Saved")
+            frappe.msgprint(_("Customer updated fo  r email: {0}").format(order_data.get("email")))
+        print("COMPLETED")
     else:
         frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
+
+
+
+
+
+
+
+
+
+
 
 
 @frappe.whitelist(allow_guest=True)
