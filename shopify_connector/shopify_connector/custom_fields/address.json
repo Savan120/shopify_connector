@@ -1,0 +1,109 @@
+{
+ "Address": [
+  {
+   "dt": "Address",
+   "fieldname": "gst_state_number",
+   "fieldtype": "Data",
+   "insert_after": "gst_category",
+   "is_system_generated": 1,
+   "label": "GST State Number",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "default": "Unregistered",
+   "dt": "Address",
+   "fieldname": "gst_category",
+   "fieldtype": "Select",
+   "insert_after": "tax_details_column_break",
+   "is_system_generated": 1,
+   "label": "GST Category",
+   "module": "Shopify Connector",
+   "options": "Registered Regular\nRegistered Composition\nUnregistered\nSEZ\nOverseas\nDeemed Export\nUIN Holders\nTax Deductor\nTax Collector\nInput Service Distributor",
+   "reqd": 1
+  },
+  {
+   "dt": "Address",
+   "fieldname": "tax_details_column_break",
+   "fieldtype": "Column Break",
+   "insert_after": "gst_state",
+   "is_system_generated": 1,
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "gst_state",
+   "fieldtype": "Select",
+   "insert_after": "gstin",
+   "is_system_generated": 1,
+   "label": "GST State",
+   "module": "Shopify Connector",
+   "options": "\nAndaman and Nicobar Islands\nAndhra Pradesh\nArunachal Pradesh\nAssam\nBihar\nChandigarh\nChhattisgarh\nDadra and Nagar Haveli and Daman and Diu\nDelhi\nGoa\nGujarat\nHaryana\nHimachal Pradesh\nJammu and Kashmir\nJharkhand\nKarnataka\nKerala\nLadakh\nLakshadweep Islands\nMadhya Pradesh\nMaharashtra\nManipur\nMeghalaya\nMizoram\nNagaland\nOdisha\nOther Countries\nOther Territory\nPuducherry\nPunjab\nRajasthan\nSikkim\nTamil Nadu\nTelangana\nTripura\nUttar Pradesh\nUttarakhand\nWest Bengal",
+   "read_only": 1
+  },
+  {
+   "dt": "Address",
+   "fieldname": "gstin",
+   "fieldtype": "Data",
+   "insert_after": "tax_details_section",
+   "is_system_generated": 1,
+   "label": "GSTIN / UIN",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "tax_details_section",
+   "fieldtype": "Section Break",
+   "insert_after": "disabled",
+   "is_system_generated": 1,
+   "label": "Tax Details",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "shopify_email",
+   "fieldtype": "Data",
+   "is_system_generated": 1,
+   "label": "Shopify Email",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Address",
+   "fieldname": "shopify_id",
+   "fieldtype": "Data",
+   "is_system_generated": 1,
+   "label": "Shopify ID",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Address",
+   "fieldname": "shopify_address_id",
+   "fieldtype": "Data",
+   "insert_after": "fax",
+   "is_system_generated": 1,
+   "label": "Shopify Address Id",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "dt": "Address",
+   "fieldname": "is_your_company_address",
+   "fieldtype": "Check",
+   "insert_after": "linked_with",
+   "label": "Is Your Company Address",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "tax_category",
+   "fieldtype": "Link",
+   "insert_after": "fax",
+   "label": "Tax Category",
+   "module": "Shopify Connector",
+   "options": "Tax Category"
+  }
+ ]
+}
