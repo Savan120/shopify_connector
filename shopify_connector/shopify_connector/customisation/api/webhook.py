@@ -982,6 +982,194 @@ def get_inventory_update():
     return location_id
 
 
+
+# @frappe.whitelist(allow_guest=True)
+# def customer_update():
+#     import base64, hashlib, hmac, requests
+
+#     raw_request_body = frappe.local.request.get_data()
+#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+#     settings = frappe.get_single("Shopify Connector Setting")
+
+#     shopify_webhook_secret = settings.shopify_webhook_secret
+#     if not shopify_webhook_secret or not shopify_hmac_header:
+#         frappe.throw("Webhook secret or signature missing.")
+
+#     secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+#     calculated_hmac = base64.b64encode(hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()).decode()
+#     if not hmac.compare_digest(calculated_hmac, shopify_hmac_header):
+#         frappe.throw("Invalid webhook signature.")
+
+#     order_data = frappe.parse_json(raw_request_body.decode("utf-8"))
+#     user = frappe.session.user = settings.webhook_session_user
+#     shopify_id = order_data.get("id")
+#     if not shopify_id:
+#         frappe.throw("Shopify customer ID is missing.")
+
+#     customer_exists = frappe.db.exists("Customer", {"shopify_id": shopify_id})
+#     if not customer_exists:
+#         frappe.msgprint(f"Customer does not exist for Shopify ID: {shopify_id}")
+#         return
+
+#     customer = frappe.get_doc("Customer", {"shopify_id": shopify_id})
+#     default_address = order_data.get("default_address")
+#     if not default_address:
+#         return
+
+#     address_id = default_address.get("id")
+#     address_exists = frappe.db.exists("Address", {"shopify_id": address_id})
+#     customer_gid = f"gid://shopify/Customer/{shopify_id}"
+
+#     address_input = {
+#         "address1": default_address.get("address1"),
+#         "address2": default_address.get("address2"),
+#         "city": default_address.get("city"),
+#         "province": default_address.get("province"),
+#         "country": default_address.get("country"),
+#         "zip": default_address.get("zip"),
+#         "phone": default_address.get("phone"),
+#         "firstName": default_address.get("first_name"),
+#         "lastName": default_address.get("last_name")
+#     }
+
+#     headers = {
+#         'Content-Type': 'application/json',
+#         'X-Shopify-Access-Token': settings.access_token,
+#     }
+
+#     if not address_exists:
+#         mutation = """
+#         mutation customerAddressCreate($address: MailingAddressInput!, $customerId: ID!, $setAsDefault: Boolean) {
+#           customerAddressCreate(address: $address, customerId: $customerId, setAsDefault: $setAsDefault) {
+#             address {
+#               id
+#             }
+#             userErrors {
+#               field
+#               message
+#             }
+#           }
+#         }
+#         """
+#         variables = {
+#             "address": address_input,
+#             "customerId": customer_gid,
+#             "setAsDefault": True
+#         }
+#     else:
+#         address_doc = frappe.get_doc("Address", address_exists)
+#         mutation = """
+#         mutation customerAddressUpdate($address: MailingAddressInput!, $addressId: ID!, $customerId: ID!, $setAsDefault: Boolean) {
+#           customerAddressUpdate(address: $address, addressId: $addressId, customerId: $customerId, setAsDefault: $setAsDefault) {
+#             address {
+#               id
+#             }
+#             userErrors {
+#               field
+#               message
+#             }
+#           }
+#         }
+#         """
+#         variables = {
+#             "address": address_input,
+#             "addressId": f"gid://shopify/MailingAddress/{address_doc.shopify_id}",
+#             "customerId": customer_gid,
+#             "setAsDefault": True
+#         }
+
+#     response = requests.post(
+#         f'https://{settings.shop_url}/admin/api/{settings.shopify_api_version}/graphql.json',
+#         headers=headers,
+#         json={'query': mutation, 'variables': variables}
+#     )
+#     response_data = response.json()
+#     error_list = response_data.get("data", {}).get("customerAddressCreate" if not address_exists else "customerAddressUpdate", {}).get("userErrors", [])
+#     if error_list:
+#         frappe.log_error(str(error_list), "GraphQL Address Error")
+
+#     address_doc = frappe.new_doc("Address") if not address_exists else frappe.get_doc("Address", address_exists)
+#     address_doc.update({
+#         "shopify_id": address_id,
+#         "address_title": f"{default_address.get('first_name', '')} {default_address.get('last_name', '')}",
+#         "address_type": "Shipping",
+#         "address_line1": default_address.get("address1"),
+#         "address_line2": default_address.get("address2"),
+#         "city": default_address.get("city"),
+#         "state": default_address.get("province"),
+#         "country": default_address.get("country"),
+#         "pincode": default_address.get("zip"),
+#         "phone": default_address.get("phone"),
+#         "first_name": default_address.get("first_name"),
+#         "last_name": default_address.get("last_name")
+#     })
+#     if not address_exists:
+#         address_doc.append("links", {
+#             "link_doctype": "Customer",
+#             "link_name": customer.name,
+#         })
+
+#     address_doc.flags.ignore_permissions = True
+#     address_doc.save(ignore_permissions=True)
+#     frappe.db.set_value("Customer", customer.name, "customer_primary_address", address_doc.name)
+
+#     contact = None
+#     if customer.customer_primary_contact:
+#         contact = frappe.get_doc("Contact", customer.customer_primary_contact)
+
+#     if not contact:
+#         contact = frappe.new_doc("Contact")
+#         contact.first_name = default_address.get("first_name")
+#         contact.middle_name = default_address.get("middle_name") or ""
+#         contact.last_name = default_address.get("last_name")
+
+#         if order_data.get("email"):
+#             contact.append("email_ids", {
+#                 "email_id": order_data.get("email"),
+#                 "is_primary": 1,
+#             })
+
+#         if order_data.get("phone"):
+#             contact.append("phone_nos", {
+#                 "phone": order_data.get("phone"),
+#                 "is_primary_phone": 1,
+#             })
+
+#         contact.append("links", {
+#             "link_doctype": "Customer",
+#             "link_name": customer.name,
+#         })
+
+#         contact.flags.ignore_permissions = True
+#         contact.save(ignore_permissions=True)
+#         frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
+
+#     else:
+#         contact.update({
+#             "first_name": default_address.get("first_name"),
+#             "middle_name": default_address.get("middle_name") or "",
+#             "last_name": default_address.get("last_name")
+#         })
+
+#         contact.set("email_ids", [])
+#         if order_data.get("email"):
+#             contact.append("email_ids", {
+#                 "email_id": order_data.get("email"),
+#                 "is_primary": 1
+#             })
+
+#         contact.set("phone_nos", [])
+#         if order_data.get("phone"):
+#             contact.append("phone_nos", {
+#                 "phone": order_data.get("phone"),
+#                 "is_primary_phone": 1
+#             })
+            
+#         contact.flags.ignore_permissions = True
+#         contact.save(ignore_permissions=True)
+
+
+
 @frappe.whitelist(allow_guest=True)
 def customer_update():
     raw_request_body = frappe.local.request.get_data()
@@ -1038,10 +1226,16 @@ def customer_update():
     response = requests.post(f'https://{settings.shop_url}/admin/api/{settings.shopify_api_version}/graphql.json', headers=headers, json=json_data)
     response_data = response.json()
     tag = ""
-    # tag = response_data["data"]["customer"]["tags"][0]
-    
-    # if not tag:
-    tag = settings.customer_group
+    tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
+    if tags:
+        tag = tags[0]
+        if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
+            customer_group = frappe.new_doc("Customer Group")
+            customer_group.customer_group_name = tag
+            customer_group.flags.ignore_permissions = True
+            customer_group.insert(ignore_permissions=True)
+    else:
+        tag = settings.customer_group
         
         
     if not shopify_id:
