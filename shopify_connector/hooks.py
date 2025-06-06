@@ -132,6 +132,10 @@ doc_events = {
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.on_address_update",
         # "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_address_from_shopify",
     },
+    "Contact": {
+        "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_contact_to_shopify",
+        # "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_address_from_shopify",
+    },
     "Item": {
         "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
