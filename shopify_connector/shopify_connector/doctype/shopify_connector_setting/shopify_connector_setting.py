@@ -603,8 +603,8 @@ def product_creation():
         
         item_group = ""
         if order_data.get("product_type"):
-            item_type_from_shopify = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
-            if not item_type_from_shopify:
+            item_group = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
+            if not item_group:
                 item_type = frappe.new_doc("Item Group")
                 item_type.item_group_name = order_data.get("product_type")
                 item_type.flags.ignore_permissions = True
@@ -623,6 +623,7 @@ def product_creation():
         item.gst_hsn_code = hsn_code_shopify
         item.description = order_data.get("body_html")
         item.item_group = item_group
+        item.custom_send_to_shopify = True
         item.stock_uom = settings.uom
         item.shopify_id = product_id
         item.custom_inventory_item_id = inventory_item_id
@@ -678,7 +679,7 @@ def product_creation():
 
         item.flags.ignore_permissions = True
         item.flags.from_shopify = True
-        item.insert(ignore_mandatory=True)
+        item.insert(ignore_permissions=True)
         item.save()
 
         if item.has_variants:
