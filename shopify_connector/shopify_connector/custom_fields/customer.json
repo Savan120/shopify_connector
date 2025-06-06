@@ -4,6 +4,7 @@
    "dt": "Customer",
    "fieldname": "custom_ignore_address_update",
    "fieldtype": "Check",
+   "hidden": 1,
    "insert_after": "custom_column_break_l0hid",
    "label": "Ignore Address Update",
    "module": "Shopify Connector"

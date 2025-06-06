@@ -189,12 +189,9 @@ def on_address_update(doc, method):
 def send_contact_to_shopify(doc, method):
     data = {
         "customer": {
-            "first_name": doc.first_name,
-            "last_name": doc.last_name,
             "email": doc.email_id,
             "phone": doc.phone,
             "verified_email": True,
-            "tags": "from_erpnext"
         }
     }
 
