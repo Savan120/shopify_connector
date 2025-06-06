@@ -882,7 +882,7 @@ def get_hsn_from_shopify(inventory_item_id, settings):
 
     try:
         response = requests.get(url, headers=headers)
-
+        frappe.log_error(f"Shopify API Response: {response.text}", "Shopify HSN Fetch")
         if response.status_code == 200:
             inventory_item = response.json().get("inventory_item", {})
             hsn_code = inventory_item.get("harmonized_system_code")
