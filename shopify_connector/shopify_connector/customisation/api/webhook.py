@@ -435,6 +435,7 @@ def customer_creation():
                     {
                         "phone": order_data.get("phone"),
                         "is_primary_phone": 1,
+                        "is_primary_mobile_no": 1,
                     },
                 )
             cus_contact.append(
@@ -1092,7 +1093,9 @@ def customer_update():
             if customer.customer_primary_address:
                 address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
                 address = frappe.get_doc("Address", address)
+                frappe.log_error(f"Address found: {address.name}")
             if not address:
+                frappe.log_error(f"Creating new address for customer: {customer.name}")
                 address = frappe.new_doc("Address")
                 address.shopify_id = address_data.get("id")
                 address.address_title = customer.name
@@ -1110,7 +1113,7 @@ def customer_update():
                     "link_doctype": "Customer",
                     "link_name": customer.name,
                 })
-
+                frappe.log_error(f"Address created: {address.name}")
             address.update({
                 "address_line1": address_data.get("address1"),
                 "address_type" : "Shipping",
@@ -1126,6 +1129,8 @@ def customer_update():
             address.flags.ignore_permissions = True
             address.save(ignore_permissions=True)
             customer.customer_primary_address = address.name
+            frappe.log_error(f"Customer primary address In Customer: {customer.customer_primary_address}")
+            frappe.log_error(f"Customer primary address updated: {address.name}")
 
             contact = None
             if customer.customer_primary_contact:
