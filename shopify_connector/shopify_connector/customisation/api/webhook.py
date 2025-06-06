@@ -509,16 +509,17 @@ def product_creation():
             item_code = v.get("sku")
             inventory_item_id = v.get("inventory_item_id")
 
-        sys_lang = frappe.get_single("System Settings").language or "en"
         settings = frappe.get_doc("Shopify Connector Setting")
         status = False
         price = 0
+        hsn_code_shopify = ""
         hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings)
         if hsn_code_shopify:
             if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_shopify}):
                 hs = frappe.new_doc("GST HSN Code")
                 hs.hsn_code = hsn_code_shopify
                 hs.insert(ignore_permissions=True)
+                hsn_code_shopify = hs.name
 
         for prices in order_data.get("variants", []):
             price = prices.get("price")
@@ -531,8 +532,8 @@ def product_creation():
 
         item_group = ""
         if order_data.get("product_type"):
-            item_type_from_shopify = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
-            if not item_type_from_shopify:
+            item_group = frappe.db.exists("Item Group", {"item_group_name": order_data.get("product_type")})
+            if not item_group:
                 item_type = frappe.new_doc("Item Group")
                 item_type.item_group_name = order_data.get("product_type")
                 item_type.flags.ignore_permissions = True
@@ -663,6 +664,7 @@ def product_creation():
 
                 variant.flags.ignore_permissions = True
                 variant.flags.from_shopify = True
+                print("variant",item.flags.from_shopify)
                 variant.insert(ignore_mandatory=True)
                 variant.save()
 
@@ -707,18 +709,10 @@ def product_update():
     item_code = ""
     for v in order_data.get("variants", []):
         item_code = v.get("sku")
-        invcustomer_groupentory_item_id = v.get("inventory_item_id")
+        inventory_item_id = v.get("inventory_item_id")
 
-    sys_lang = frappe.get_single("System Settings").language or "en"
     status = False
     price = 0
-    hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings_for_secret)
-    if hsn_code_shopify:
-        if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_shopify}):
-            hs = frappe.new_doc("GST HSN Code")
-            hs.hsn_code = hsn_code_shopify
-            hs.insert(ignore_permissions=True)
-
     for prices in order_data.get("variants", []):
         price = prices.get("price")
 
@@ -732,10 +726,11 @@ def product_update():
         item_group = settings_for_secret.item_group
 
     item_doc = frappe.db.exists("Item", {"shopify_id": product_id})
+    if not item_doc:
+        return "Product does not exist."
     item = frappe.get_doc("Item", item_doc)
     item.item_code = item_code
     item.item_name = order_data.get("title")
-    item.gst_hsn_code = hsn_code_shopify
     item.description = order_data.get("body_html")
     item.item_group = item_group
     item.stock_uom = settings_for_secret.uom
@@ -794,8 +789,7 @@ def product_update():
 
     item.flags.ignore_permissions = True
     item.flags.from_shopify = True
-
-    
+    print(order_data)
     item.save()
 
     if item.has_variants:
@@ -838,7 +832,6 @@ def product_update():
                             variant.append("attributes", {"attribute": matched_attr, "attribute_value": opt_value})
                     else:
                         variant.append("attributes", {"attribute": matched_attr, "attribute_value": opt_value})
-
             inventory_item_id = v.get("inventory_item_id")
             if inventory_item_id:
                 hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings_for_secret)
@@ -852,10 +845,8 @@ def product_update():
             variant.flags.ignore_permissions = True
             variant.flags.from_shopify = True
 
-
             variant.save()
         
-
     return "Product created with variants and HSN."
 
 
@@ -863,7 +854,6 @@ def product_update():
 @frappe.whitelist(allow_guest=True)
 def get_hsn_from_shopify(inventory_item_id, settings):
     inventory_item_id = str(inventory_item_id)
-
     if isinstance(settings, str):
         try:
             settings = json.loads(settings)
@@ -871,18 +861,15 @@ def get_hsn_from_shopify(inventory_item_id, settings):
             frappe.log_error(f"Invalid settings JSON: {str(e)}", "Shopify HSN Fetch")
             return None
 
-    frappe.log_error("Fetching HSN code for inventory item ID: {}".format(inventory_item_id))
-    frappe.log_error("Shopify settings: {}".format(settings))
 
-    url = f"https://{settings['shop_url']}/admin/api/2024-01/inventory_items/{inventory_item_id}.json"
+    url = f"https://{settings.shop_url}/admin/api/2024-01/inventory_items/{inventory_item_id}.json"
     headers = {
-        "X-Shopify-Access-Token": settings['access_token'],
+        "X-Shopify-Access-Token": settings.access_token,
         "Content-Type": "application/json",
     }
 
     try:
         response = requests.get(url, headers=headers)
-        frappe.log_error(f"Shopify API Response: {response.text}", "Shopify HSN Fetch")
         if response.status_code == 200:
             inventory_item = response.json().get("inventory_item", {})
             hsn_code = inventory_item.get("harmonized_system_code")

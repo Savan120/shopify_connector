@@ -554,7 +554,6 @@ def customer_creation():
             
             
 
-@frappe.whitelist()
 def product_creation():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_API_KEY = shopify_keys.api_key
@@ -737,7 +736,6 @@ def product_creation():
 @frappe.whitelist(allow_guest=True)
 def get_hsn_from_shopify(inventory_item_id, settings):
     inventory_item_id = str(inventory_item_id)
-
     if isinstance(settings, str):
         try:
             settings = json.loads(settings)
@@ -745,18 +743,15 @@ def get_hsn_from_shopify(inventory_item_id, settings):
             frappe.log_error(f"Invalid settings JSON: {str(e)}", "Shopify HSN Fetch")
             return None
 
-    frappe.log_error("Fetching HSN code for inventory item ID: {}".format(inventory_item_id))
-    frappe.log_error("Shopify settings: {}".format(settings))
 
-    url = f"https://{settings['shop_url']}/admin/api/2024-01/inventory_items/{inventory_item_id}.json"
+    url = f"https://{settings.shop_url}/admin/api/2024-01/inventory_items/{inventory_item_id}.json"
     headers = {
-        "X-Shopify-Access-Token": settings['access_token'],
+        "X-Shopify-Access-Token": settings.access_token,
         "Content-Type": "application/json",
     }
 
     try:
         response = requests.get(url, headers=headers)
-
         if response.status_code == 200:
             inventory_item = response.json().get("inventory_item", {})
             hsn_code = inventory_item.get("harmonized_system_code")
@@ -768,6 +763,7 @@ def get_hsn_from_shopify(inventory_item_id, settings):
     except Exception as e:
         frappe.log_error(f"HSN Fetch Error: {str(e)}", "Shopify HSN Fetch")
         return None
+
 
 
 @frappe.whitelist()
