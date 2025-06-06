@@ -699,7 +699,7 @@ def product_update():
         frappe.throw(_("An unexpected error occurred during webhook verification: {0}").format(e))
 
     order_data = json.loads(raw_request_body.decode("utf-8"))
-    user = frappe.session.user = settings.webhook_session_user 
+    user = frappe.session.user = settings_for_secret.webhook_session_user 
     if not user:
         frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
     product_id = order_data.get("id")
@@ -710,10 +710,9 @@ def product_update():
         invcustomer_groupentory_item_id = v.get("inventory_item_id")
 
     sys_lang = frappe.get_single("System Settings").language or "en"
-    settings = frappe.get_doc("Shopify Connector Setting")
     status = False
     price = 0
-    hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings)
+    hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings_for_secret)
     if hsn_code_shopify:
         if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_shopify}):
             hs = frappe.new_doc("GST HSN Code")
@@ -739,7 +738,7 @@ def product_update():
     item.gst_hsn_code = hsn_code_shopify
     item.description = order_data.get("body_html")
     item.item_group = item_group
-    item.stock_uom = settings.uom
+    item.stock_uom = settings_for_secret.uom
     item.shopify_id = product_id
     item.custom_send_to_shopify = 1
     item.custom_inventory_item_id = inventory_item_id
@@ -842,7 +841,7 @@ def product_update():
 
             inventory_item_id = v.get("inventory_item_id")
             if inventory_item_id:
-                hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings)
+                hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings_for_secret)
                 if hsn_code_shopify:
                     if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_shopify}):
                         hs = frappe.new_doc("GST HSN Code")
