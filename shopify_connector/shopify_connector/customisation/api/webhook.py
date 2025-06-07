@@ -673,8 +673,6 @@ def product_creation():
         frappe.log_error(title="Shopify Order Sync Error", message=frappe.get_traceback())
         return "Product sync is disabled in Shopify Connector Setting."
 
-
-
 @frappe.whitelist(allow_guest=True)
 def product_update():
     raw_request_body = frappe.local.request.get_data()
@@ -701,52 +699,74 @@ def product_update():
         frappe.throw(_("An unexpected error occurred during webhook verification: {0}").format(e))
 
     order_data = json.loads(raw_request_body.decode("utf-8"))
+    
     user = frappe.session.user = settings_for_secret.webhook_session_user 
     if not user:
         frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
+    
     product_id = order_data.get("id")
-    inventory_item_id = None
-    item_code = ""
-    for v in order_data.get("variants", []):
-        item_code = v.get("sku")
-        inventory_item_id = v.get("inventory_item_id")
-
-    status = False
-    price = 0
-    for prices in order_data.get("variants", []):
-        price = prices.get("price")
-
-    if order_data.get("status") == "draft":
-        status = True
-        
-    item_group = ""
-    if order_data.get("product_type"):
-            item_group = order_data.get("product_type")
-    else:
-        item_group = settings_for_secret.item_group
-
-    item_doc = frappe.db.exists("Item", {"shopify_id": product_id})
-    if not item_doc:
+    
+    item_doc_name = frappe.db.exists("Item", {"shopify_id": product_id})
+    if not item_doc_name:
+        frappe.log_error(f"Product with Shopify ID {product_id} does not exist in ERPNext.")
         return "Product does not exist."
-    item = frappe.get_doc("Item", item_doc)
-    item.item_code = item_code
+    
+    item = frappe.get_doc("Item", item_doc_name)
+
+    # Store the existing HSN code before updating
+    existing_hsn_code_parent = item.gst_hsn_code
+
+    item_group = order_data.get("product_type") if order_data.get("product_type") else settings_for_secret.item_group
+
     item.item_name = order_data.get("title")
     item.description = order_data.get("body_html")
     item.item_group = item_group
     item.stock_uom = settings_for_secret.uom
     item.shopify_id = product_id
     item.custom_send_to_shopify = 1
-    item.custom_inventory_item_id = inventory_item_id
-    item.shopify_selling_rate = price
+    item.disabled = True if order_data.get("status") == "draft" else False
 
     options = order_data.get("options", [])
-    has_real_variants = any(
-        opt.get("name") != "Title" and len(opt.get("values", [])) > 1 for opt in options
-    )
-    item.has_variants = 1 if has_real_variants else 0
-    item.disabled = status
+    
+    is_default_title_only = False
+    if len(options) == 1 and options[0].get("name") == "Title" and options[0].get("values") == ["Default Title"]:
+        is_default_title_only = True
 
-    if item.has_variants:
+    if is_default_title_only:
+        item.has_variants = 0
+        item.set("attributes", [])
+        
+        existing_child_variants = frappe.get_list("Item", filters={"variant_of": item.name})
+        for variant_data in existing_child_variants:
+            try:
+                frappe.delete_doc("Item", variant_data.name, ignore_permissions=True)
+                frappe.log_error(f"Deleted old variant: {variant_data.name} for product {item.name}")
+            except Exception as e:
+                frappe.log_error(f"Error deleting old variant {variant_data.name}: {e}", "Shopify Webhook Product Update")
+
+        default_variant_data = order_data.get("variants")[0]
+        item.item_code = default_variant_data.get("sku")
+        item.shopify_selling_rate = default_variant_data.get("price")
+        item.custom_inventory_item_id = default_variant_data.get("inventory_item_id")
+        
+        inventory_item_id_parent = default_variant_data.get("inventory_item_id")
+        hsn_code_for_parent = None
+        if inventory_item_id_parent:
+            hsn_code_for_parent = get_hsn_from_shopify(inventory_item_id_parent, settings_for_secret)
+        
+        if hsn_code_for_parent:
+            if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_for_parent}):
+                hs = frappe.new_doc("GST HSN Code")
+                hs.hsn_code = hsn_code_for_parent
+                hs.insert(ignore_permissions=True)
+            item.gst_hsn_code = hsn_code_for_parent
+        elif existing_hsn_code_parent: # Use existing HSN if new one not found
+            item.gst_hsn_code = existing_hsn_code_parent
+
+    else:
+        item.has_variants = 1
+
+        item.set("attributes", [])
         for opt in options:
             attr_name = opt["name"]
             if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
@@ -768,36 +788,37 @@ def product_update():
 
             attr_doc.flags.ignore_permissions = True
             attr_doc.save()
+            item.append("attributes", {"attribute": attr_name})
+        
+        existing_erpnext_variants_ids = [
+            v.custom_variant_id 
+            for v in frappe.get_list("Item", filters={"variant_of": item.name, "custom_variant_id": ["is", "set"]}, fields=["custom_variant_id"])]
+        
+        shopify_variant_ids_in_payload = [v.get("id") for v in order_data.get("variants", [])]
 
-            if len(item.attributes) > 0:
-                for row in item.attributes:
-                    if row.attribute == attr_name:
-                        break
-                else:
-                    item.append("attributes", {"attribute": attr_name})
-            else:
-                item.append("attributes", {"attribute": attr_name})
+        for erpnext_variant_id in existing_erpnext_variants_ids:
+            if erpnext_variant_id not in shopify_variant_ids_in_payload:
+                try:
+                    variant_to_delete = frappe.get_doc("Item", {"custom_variant_id": erpnext_variant_id})
+                    frappe.delete_doc("Item", variant_to_delete.name, ignore_permissions=True)
+                    frappe.log_error(f"Deleted variant: {variant_to_delete.name} (Shopify ID: {erpnext_variant_id}) as it was removed from Shopify.")
+                except Exception as e:
+                    frappe.log_error(f"Error deleting variant with Shopify ID {erpnext_variant_id}: {e}", "Shopify Webhook Product Update")
 
-    images = order_data.get("images", [])
-    img_link = images[0]["src"] if images else ""
-    if img_link:
-        file_doc = frappe.get_doc(
-            {"doctype": "File", "file_url": img_link, "is_private": 0}
-        )
-        file_doc.insert(ignore_permissions=True)
-        item.image = file_doc.file_url
-
-    item.flags.ignore_permissions = True
-    item.flags.from_shopify = True
-    print(order_data)
-    item.save()
-
-    if item.has_variants:
+            
         for v in order_data.get("variants", []):
-            if frappe.db.exists("Item", {"custom_variant_id": v.get("id")}):
-                variant = frappe.get_doc("Item", {"custom_variant_id": v.get("id")})
+            print(">>>>>>>>>>>>>>.", v.get("id"), "\n\n\n\n", v)
+
+            variant_erp_doc = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
+            
+            print("Variant ERP Doc!!!!!!!!!!!!!!!!!!!!!!:", variant_erp_doc)
+            
+            if variant_erp_doc:
+                variant = frappe.get_doc("Item", variant_erp_doc)
+                existing_hsn_code_variant = variant.gst_hsn_code
             else:
                 variant = frappe.new_doc("Item")
+                existing_hsn_code_variant = None
 
             variant.item_code = order_data.get("title") + "-" + v.get("title")
             variant.item_name = order_data.get("title") + "-" + v.get("title")
@@ -808,51 +829,61 @@ def product_update():
             variant.shopify_selling_rate = v.get("price")
             variant.custom_variant_id = v.get("id")
             variant.custom_inventory_item_id = v.get("inventory_item_id")
+            
+            variant.set("attributes", [])
 
             variant_options = [v.get("option1"), v.get("option2"), v.get("option3")]
 
-            for opt_value in variant_options:
+            for i, opt_value in enumerate(variant_options):
                 if not opt_value:
                     continue
-                matched_attr = None
-                for opt in options:
-                    attr_name = opt["name"]
-                    attr_doc = frappe.get_doc("Item Attribute", attr_name)
-                    attribute_values = [d.attribute_value for d in attr_doc.item_attribute_values]
-                    if opt_value in attribute_values:
-                        matched_attr = attr_name
-                        break
+                if i < len(options):
+                    matched_attr = options[i]["name"]
+                    variant.append("attributes", {"attribute": matched_attr, "attribute_value": opt_value})
 
-                if matched_attr:
-                    if len(variant.attributes) > 0:
-                        for row in variant.attributes:
-                            if row.attribute == matched_attr:
-                                break
-                        else:
-                            variant.append("attributes", {"attribute": matched_attr, "attribute_value": opt_value})
-                    else:
-                        variant.append("attributes", {"attribute": matched_attr, "attribute_value": opt_value})
-            inventory_item_id = v.get("inventory_item_id")
-            if inventory_item_id:
-                hsn_code_shopify = get_hsn_from_shopify(inventory_item_id, settings_for_secret)
-                if hsn_code_shopify:
-                    if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_shopify}):
-                        hs = frappe.new_doc("GST HSN Code")
-                        hs.hsn_code = hsn_code_shopify
-                        hs.insert(ignore_permissions=True)
-                    variant.gst_hsn_code = hsn_code_shopify
+            inventory_item_id_variant = v.get("inventory_item_id")
+            hsn_code_for_variant = None
+            if inventory_item_id_variant:
+                print("Fetching HSN code f>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>:", existing_hsn_code_variant)
+                hsn_code_for_variant = get_hsn_from_shopify(inventory_item_id_variant, settings_for_secret, existing_hsn_code_variant)
+                print("HSN Code fetched for variant:", hsn_code_for_variant)
+            
+            if hsn_code_for_variant:
+                print("HSN Code from Shopify:", hsn_code_for_variant)
+                if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_for_variant}):
+                    hs = frappe.new_doc("GST HSN Code")
+                    hs.hsn_code = hsn_code_for_variant
+                    hs.insert(ignore_permissions=True)
+                variant.gst_hsn_code = hsn_code_for_variant
+
 
             variant.flags.ignore_permissions = True
             variant.flags.from_shopify = True
-
             variant.save()
-        
-    return "Product created with variants and HSN."
+
+    images = order_data.get("images", [])
+    img_link = images[0]["src"] if images else ""
+    if img_link:
+        file_doc_name = frappe.db.exists("File", {"file_url": img_link})
+        if not file_doc_name:
+            file_doc = frappe.get_doc(
+                {"doctype": "File", "file_url": img_link, "is_private": 0, "attached_to_doctype": "Item", "attached_to_name": item.name}
+            )
+            file_doc.insert(ignore_permissions=True)
+            item.image = file_doc.file_url
+        else:
+            item.image = img_link
+
+    item.flags.ignore_permissions = True
+    item.flags.from_shopify = True
+    item.save()
+
+    return "Product updated successfully."
 
 
 
-@frappe.whitelist(allow_guest=True)
-def get_hsn_from_shopify(inventory_item_id, settings):
+def get_hsn_from_shopify(inventory_item_id, settings,existing_hsn_code_variant=None):
+    print(inventory_item_id, settings)
     inventory_item_id = str(inventory_item_id)
     if isinstance(settings, str):
         try:
@@ -867,20 +898,20 @@ def get_hsn_from_shopify(inventory_item_id, settings):
         "X-Shopify-Access-Token": settings.access_token,
         "Content-Type": "application/json",
     }
+    # try:
+    response = requests.get(url, headers=headers)
+    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>",response.json())
+    if response.status_code == 200:
+        inventory_item = response.json().get("inventory_item", {})
+        hsn_code = inventory_item.get("harmonized_system_code")
+        print("HSN Code fetched from Shopify:", hsn_code)
+        return hsn_code
+    else:
+        return existing_hsn_code_variant
 
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            inventory_item = response.json().get("inventory_item", {})
-            hsn_code = inventory_item.get("harmonized_system_code")
-            return hsn_code
-        else:
-            frappe.log_error(f"HSN Fetch Failed: {response.text}", "Shopify HSN Fetch")
-            return None
-
-    except Exception as e:
-        frappe.log_error(f"HSN Fetch Error: {str(e)}", "Shopify HSN Fetch")
-        return None
+    # except Exception as e:
+    #     frappe.log_error(f"HSN Fetch Error: {str(e)}", "Shopify HSN Fetch")
+    #     return None
 
 @frappe.whitelist(allow_guest=True)
 def get_inventory_level():

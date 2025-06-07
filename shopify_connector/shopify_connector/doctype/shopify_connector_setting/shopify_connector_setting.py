@@ -807,7 +807,6 @@ def set_items_in_sales_order(new_sales_order, shopify_connector_setting, order_i
     if not frappe.db.exists("Warehouse", default_warehouse) and not shopify_connector_setting.warehouse:
         frappe.throw(_("Please set Warehouse in shopify_connector_setting"))
 
-    # total_amount = 0.0
     for item in line_items:
         shopify_item_id = item.get("product_id")
         found_item = frappe.get_doc("Item", {"shopify_id": cstr(shopify_item_id)})		
