@@ -1078,7 +1078,6 @@ def customer_update():
         customer.custom_ignore_address_update = True
         customer.flags.from_shopify = True
         customer.save()
-        print("!!!!!!!!!!!!!!!!!!!!",customer.custom_ignore_address_update, customer.flags.from_shopify)
         state = ""
         pincode = ""
         if order_data.get("default_address"):
@@ -1090,11 +1089,12 @@ def customer_update():
             address = None
 
             address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
+            if not address:
+                address = frappe.db.get_value("Dynamic Link", {"link_doctype": "Customer", "link_name": customer.name}, "parent")
             if address:
                 address = frappe.get_doc("Address", address)
             else:
                 address = frappe.new_doc("Address")
-                address.shopify_id = address_data.get("id")
                 address.address_title = customer.name
                 address.address_type = "Shipping"
                 address.address_line1 = address_data.get("address1")
@@ -1111,6 +1111,7 @@ def customer_update():
                     "link_name": customer.name,
                 })
             address.update({
+                "shopify_id": address_data.get("id"),
                 "address_line1": address_data.get("address1"),
                 "address_type" : "Shipping",
                 "address_line2": address_data.get("address2"),
@@ -1119,12 +1120,12 @@ def customer_update():
                 "country": address_data.get("country"),
                 "pincode": address_data.get("zip"),
                 "phone": address_data.get("phone"),
-                "address_title": f"{address_data.get('first_name', '')} {address_data.get('last_name', '')}",
+                "address_title": f"{address_data.get('first_name', '')}",
                 "address_type": "Shipping"
             })
             address.flags.ignore_permissions = True
             address.save()
-            frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name)
+            frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name, update_modified = False)
             contact = None
             contact_name = frappe.db.get_value(
                 "Dynamic Link",

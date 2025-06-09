@@ -48,8 +48,6 @@ def send_customer_to_shopify_hook(doc, method):
             if contact_doc.phone:
                 phone = contact_doc.phone
                 
-        except frappe.DoesNotExistError:
-            frappe.log_error(f"Linked contact '{contact_doc_name}' not found for customer {doc.name}", "Shopify Sync - Contact Missing")
         except Exception as e:
             frappe.log_error(f"Error fetching linked contact '{contact_doc_name}' for customer {doc.name}: {str(e)}", "Shopify Sync Error")
 
@@ -60,7 +58,6 @@ def send_customer_to_shopify_hook(doc, method):
         "parenttype": "Address"
     }, fields=["parent"])
 
-    print(address_links,"||||||||||||||||||||||||||||||")
     if not address_links and doc.customer_name != doc.name:
         address_links = frappe.get_all("Dynamic Link", filters={
             "link_doctype": "Customer",
@@ -149,59 +146,31 @@ def send_customer_to_shopify_hook(doc, method):
         shopify_customer = response.json().get("customer", {})
         shopify_id = shopify_customer.get("id")
         shopify_email = shopify_customer.get("email")
-        shopify_addresses = shopify_customer.get("addresses", [])
         
         doc.flags.from_shopify = True
         doc.db_set("shopify_id", shopify_id)
         if contact_name:
             doc.db_set("customer_primary_contact", contact_name)
-        
         doc.db_set("shopify_email", shopify_email)
-
-        def is_same_address(local, shopify):
-            return (
-                (local.address_line1 or "").strip().lower() == (shopify.get("address1") or "").strip().lower() and
-                (local.address_line2 or "").strip().lower() == (shopify.get("address2") or "").strip().lower() and
-                (local.city or "").strip().lower() == (shopify.get("city") or "").strip().lower() and
-                (local.state or local.custom_state or "").strip().lower() == (shopify.get("province") or "").strip().lower() and
-                (local.country or "").strip().lower() == (shopify.get("country") or "").strip().lower() and
-                (local.pincode or "").strip() == (shopify.get("zip") or "").strip()
-            )
-
-        local_addresses_to_update = []
-        if address_links:
-            for link in address_links:
-                local_address = frappe.get_doc("Address", link["parent"])
-                local_addresses_to_update.append(local_address)
-        elif doc.get("customer_primary_address"):
-            local_addresses_to_update.append(frappe.get_doc("Address", doc.customer_primary_address))
-
-        for local_addr_doc in local_addresses_to_update:
-            if not local_addr_doc.shopify_id:
-                for shopify_addr in shopify_addresses:
-                    if is_same_address(local_addr_doc, shopify_addr):
-                        local_addr_doc.db_set("shopify_id", shopify_addr.get("id"))
-                        break
-
     except Exception as e:
         frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
 
+
 def on_address_update(doc, method):
-    for link in doc.links:
-        if link.link_doctype == "Customer" and link.link_name:
-            try:
-                customer = frappe.get_doc("Customer", link.link_name)
-                send_customer_to_shopify_hook(customer, "update")
-            except Exception as e:
-                frappe.log_error(f"Error syncing customer from address hook: {str(e)}", "Shopify Sync Error")
-
-
-def send_contact_to_shopify(doc, method):
+    payload = [{
+        "address1": doc.address_line1,
+        "address2": doc.address_line2 or "",
+        "city": doc.city,
+        "province": doc.state or doc.custom_state or "",
+        "country": doc.country,
+        "zip": doc.pincode,
+        "phone": doc.phone,
+        "email": doc.email_id
+    }]
+    
     data = {
-        "customer": {
-            "email": doc.email_id,
-            "phone": doc.phone,
-            "verified_email": True,
+        "customer":{
+            "addresses": payload
         }
     }
 
@@ -213,9 +182,44 @@ def send_contact_to_shopify(doc, method):
     SHOPIFY_STORE_URL = shopify_keys.shop_url
     SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
 
+    shopify_customer_id = frappe.db.get_value("Customer", {"customer_primary_address": doc.name}, "shopify_id")
+    if not shopify_customer_id:
+        for row in doc.links:
+            if row.link_doctype == "Customer":
+                shopify_customer_id = frappe.db.get_value("Customer", row.link_name, "shopify_id")
+
+    url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}.json"
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
+    }
+
+    response = requests.put(url, json=data, headers=headers)
+    if response.status_code not in (200, 201):
+        frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
+
+def send_contact_to_shopify(doc, method):
+    data = {
+        "customer": {
+            "email": doc.email_id,
+            "phone": doc.phone,
+            "verified_email": True,
+        }
+    }
+    shopify_keys = frappe.get_single("Shopify Connector Setting")
+    if not shopify_keys.sync_customer:
+        return
+
+    SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
+    SHOPIFY_STORE_URL = shopify_keys.shop_url
+    SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
+
     shopify_customer_id = frappe.db.get_value("Customer", {"customer_primary_contact": doc.name}, "shopify_id")
     if not shopify_customer_id:
-        return
+        for row in doc.links:
+            if row.link_doctype == "Customer":
+                shopify_customer_id = frappe.db.get_value("Customer", row.link_name, "shopify_id")
+
     url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}.json"
     headers = {
         "Content-Type": "application/json",
