@@ -665,6 +665,7 @@ def product_creation():
         frappe.log_error(title="Shopify Order Sync Error", message=frappe.get_traceback())
         return "Product sync is disabled in Shopify Connector Setting."
 
+
 @frappe.whitelist(allow_guest=True)
 def product_update():
     raw_request_body = frappe.local.request.get_data()
@@ -778,6 +779,7 @@ def product_update():
                     attr_doc.append("item_attribute_values", {"attribute_value": val, "abbr": val})
 
             attr_doc.flags.ignore_permissions = True
+            attr_doc.from_shopify = True
             attr_doc.save()
             item.append("attributes", {"attribute": attr_name})
         

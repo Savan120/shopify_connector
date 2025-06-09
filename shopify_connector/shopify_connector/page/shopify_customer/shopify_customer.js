@@ -80,14 +80,11 @@ frappe.pages['shopify-customer'].on_page_load = function(wrapper) {
 
         document.head.appendChild(styleElement);
 
-        console.log(":::::::::::syncedCustomers 22:::::::::::", syncedCustomers[0])
-        console.log(":::::::::::total_count 22:::::::::::", syncedCustomers[1])
-
         var tableHtml = `
             <table class="table-bordered">
                 <thead>
                     <tr class='table-bordered th'>
-                        <th>Customer Name</th> <th>Shopify ID</th> <th>Shopify Email</th>
+                        <th>Shopify ID</th>  <th>Customer Name</th>  <th>Shopify Email</th>
                         </tr>
                 </thead>
                 <tbody>`;
@@ -95,7 +92,7 @@ frappe.pages['shopify-customer'].on_page_load = function(wrapper) {
         syncedCustomers[0].forEach(function(customer) {
             tableHtml += `
                 <tr>
-                    <td><a href="/app/customer/${customer.shopify_id || 'N/A'}">${customer.shopify_id || 'N/A'}</td> <td>${customer.shopify_email || 'N/A'}</td> 
+                    <td>${customer.shopify_id || 'N/A'}</td> <td><a href="/app/customer/${customer.shopify_customer || 'N/A'}"></td> <td>${customer.shopify_email || 'N/A'}</td>
                 </tr>`;
         });
 
@@ -107,6 +104,5 @@ frappe.pages['shopify-customer'].on_page_load = function(wrapper) {
         $(page.body).html(totalCountHtml + tableHtml);
     }
 
-    // Fetch and render synced customers when the page loads
     fetchSyncedCustomers();
 };

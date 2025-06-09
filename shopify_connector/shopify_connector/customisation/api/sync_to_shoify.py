@@ -206,7 +206,6 @@ def send_address_to_shopify(address_doc, method):
 
     shopify_customer_id = frappe.db.get_value("Customer", customer_name, "shopify_id")
     if not shopify_customer_id:
-        frappe.log_warning(f"Customer {customer_name} does not have a Shopify ID. Cannot sync address {address_doc.name}.", "Shopify Address Sync Warning")
         return
 
     data = {
@@ -301,9 +300,6 @@ def delete_customer_from_shopify(doc, method):
 
     if response.status_code != 200:
         frappe.log_error(f"Failed to delete customer from Shopify: {response.text}", "Shopify Customer Delete Error")
-
-
-
 
 
 def get_current_domain_name() -> str:
