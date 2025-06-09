@@ -60,7 +60,7 @@ def send_customer_to_shopify_hook(doc, method):
                     key = f"{addr.get('address1', '')}-{addr.get('city', '')}-{addr.get('country', '')}".lower()
                     existing_shopify_addresses[key] = addr.get("id")
         except Exception as e:
-            frappe.log_warning(f"Could not fetch existing Shopify addresses for customer {doc.name}: {str(e)}")
+            frappe.log_error(f"Could not fetch existing Shopify addresses for customer {doc.name}: {str(e)}")
 
     def create_address_payload(address_doc):
         payload = {
