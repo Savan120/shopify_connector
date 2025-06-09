@@ -485,7 +485,7 @@ def customer_creation():
         else:
             customer_name = first_name
             
-        if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
+        if not frappe.db.exists("Customer", {"shopify_id": order_data.get("id")}):
             cus = frappe.new_doc("Customer")
             cus.flags.from_shopify = True
             cus.shopify_email = order_data.get("email") or ""

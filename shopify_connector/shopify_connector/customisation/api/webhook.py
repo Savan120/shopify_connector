@@ -779,25 +779,10 @@ def product_update():
                     attr_doc.append("item_attribute_values", {"attribute_value": val, "abbr": val})
 
             attr_doc.flags.ignore_permissions = True
-            attr_doc.from_shopify = True
+            attr_doc.flags.from_shopify = True
             attr_doc.save()
             item.append("attributes", {"attribute": attr_name})
         
-        existing_erpnext_variants_ids = [
-            v.custom_variant_id 
-            for v in frappe.get_list("Item", filters={"variant_of": item.name, "custom_variant_id": ["is", "set"]}, fields=["custom_variant_id"])]
-        
-        shopify_variant_ids_in_payload = [v.get("id") for v in order_data.get("variants", [])]
-
-        for erpnext_variant_id in existing_erpnext_variants_ids:
-            if erpnext_variant_id not in shopify_variant_ids_in_payload:
-                try:
-                    variant_to_delete = frappe.get_doc("Item", {"custom_variant_id": erpnext_variant_id})
-                    frappe.delete_doc("Item", variant_to_delete.name, ignore_permissions=True)
-                    frappe.log_error(f"Deleted variant: {variant_to_delete.name} (Shopify ID: {erpnext_variant_id}) as it was removed from Shopify.")
-                except Exception as e:
-                    frappe.log_error(f"Error deleting variant with Shopify ID {erpnext_variant_id}: {e}", "Shopify Webhook Product Update")
-
             
         for v in order_data.get("variants", []):
             variant_erp_doc = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
@@ -844,7 +829,7 @@ def product_update():
 
 
             variant.flags.ignore_permissions = True
-            variant.flags.from_shopify = True
+            variant.custom_ignore_product_update = True
             variant.save()
 
     images = order_data.get("images", [])
@@ -1081,7 +1066,6 @@ def customer_update():
             return
 
         customer.flags.ignore_permissions = True
-        
         customer_name = ""
         if order_data.get("first_name") or order_data.get("last_name"):
             customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
@@ -1092,8 +1076,9 @@ def customer_update():
         customer.customer_group = tag
         customer.default_currency = order_data.get("currency")
         customer.custom_ignore_address_update = True
-        customer.from_shopify = True
+        customer.flags.from_shopify = True
         customer.save()
+        print("!!!!!!!!!!!!!!!!!!!!",customer.custom_ignore_address_update, customer.flags.from_shopify)
         state = ""
         pincode = ""
         if order_data.get("default_address"):
@@ -1105,8 +1090,9 @@ def customer_update():
             address = None
 
             address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
-            address = frappe.get_doc("Address", address)
-            if not address:
+            if address:
+                address = frappe.get_doc("Address", address)
+            else:
                 address = frappe.new_doc("Address")
                 address.shopify_id = address_data.get("id")
                 address.address_title = customer.name
@@ -1137,13 +1123,22 @@ def customer_update():
                 "address_type": "Shipping"
             })
             address.flags.ignore_permissions = True
-            address.save(ignore_permissions=True)
-            frappe.db.set_value("Customer", customer.name, "customer_primary_address", address.name)
-
+            address.save()
+            frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name)
             contact = None
-            if customer.customer_primary_contact:
-                contact = frappe.get_doc("Contact", customer.customer_primary_contact)
-            
+            contact_name = frappe.db.get_value(
+                "Dynamic Link",
+                {
+                    "link_doctype": "Customer",
+                    "link_name": customer.name,
+                    "parenttype": "Contact"
+                },
+                "parent"
+            )
+
+            if contact_name:
+                contact = frappe.get_doc("Contact", contact_name)
+
             if not contact:
                 contact = frappe.new_doc("Contact")
                 contact.first_name = address_data.get("first_name")
@@ -1164,8 +1159,8 @@ def customer_update():
                     "link_name": customer.name,
                 })
                 contact.flags.ignore_permissions = True
-                contact.save(ignore_permissions=True)
-                frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)                
+                contact.save()
+                frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
             else:
                 contact.update({
                     "first_name": address_data.get("first_name"),
@@ -1184,7 +1179,8 @@ def customer_update():
                     }])
                 contact.flags.ignore_permissions = True
                 contact.save()
-            frappe.msgprint(_("Customer updated fo  r email: {0}").format(order_data.get("email")))
+                frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
+        
     else:
         frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
 

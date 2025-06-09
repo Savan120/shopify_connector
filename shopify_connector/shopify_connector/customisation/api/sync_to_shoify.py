@@ -7,11 +7,14 @@ def enqueue_send_customer_to_shopify(doc, method):
     if not getattr(doc.flags, "from_shopify", False):
         enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
 
-def send_customer_to_shopify_hook_delayed(doc):
+def send_customer_to_shopify_hook_delayed(doc,method):
     send_customer_to_shopify_hook(doc, "after_insert")
     
+    
+    
 def send_customer_to_shopify_hook(doc, method):
-    if doc.get("from_shopify"):
+
+    if doc.flags.from_shopify:
         return
 
     if doc.get("custom_ignore_address_update"):
@@ -22,13 +25,34 @@ def send_customer_to_shopify_hook(doc, method):
     if not shopify_keys.sync_customer:
         return
 
-    SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
     SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
 
-    email = ""
-    phone = ""
+    email = doc.email_id or ""
+    phone = doc.mobile_no or ""
+    
+    contact_name = None
+
+    linked_contacts = frappe.db.get_value("Dynamic Link",{"link_doctype": "Customer","link_name": doc.name,"parenttype": "Contact" }, "parent", order_by="creation asc") 
+
+    if linked_contacts:
+        try:
+            contact_doc_name = linked_contacts
+            contact_doc = frappe.get_doc("Contact", contact_doc_name)
+            
+            contact_name = contact_doc.name 
+            
+            if contact_doc.email_id:
+                email = contact_doc.email_id
+            if contact_doc.phone:
+                phone = contact_doc.phone
+                
+        except frappe.DoesNotExistError:
+            frappe.log_error(f"Linked contact '{contact_doc_name}' not found for customer {doc.name}", "Shopify Sync - Contact Missing")
+        except Exception as e:
+            frappe.log_error(f"Error fetching linked contact '{contact_doc_name}' for customer {doc.name}: {str(e)}", "Shopify Sync Error")
+
 
     address_links = frappe.get_all("Dynamic Link", filters={
         "link_doctype": "Customer",
@@ -36,6 +60,7 @@ def send_customer_to_shopify_hook(doc, method):
         "parenttype": "Address"
     }, fields=["parent"])
 
+    print(address_links,"||||||||||||||||||||||||||||||")
     if not address_links and doc.customer_name != doc.name:
         address_links = frappe.get_all("Dynamic Link", filters={
             "link_doctype": "Customer",
@@ -90,20 +115,6 @@ def send_customer_to_shopify_hook(doc, method):
         primary_address = frappe.get_doc("Address", doc.customer_primary_address)
         address_list.append(create_address_payload(primary_address))
 
-    email = ""
-    phone = ""
-
-    if doc.get("customer_primary_contact"):
-        contact = frappe.get_doc("Contact", doc.customer_primary_contact)
-        email = contact.email_id or ""
-        phone = contact.phone or ""
-
-    if not phone:
-        phone = doc.mobile_no or ""
-
-    if not email:
-        email = doc.email_id or ""
-
     customer_payload = {
         "customer": {
             "first_name": doc.customer_name or "",
@@ -139,10 +150,13 @@ def send_customer_to_shopify_hook(doc, method):
         shopify_id = shopify_customer.get("id")
         shopify_email = shopify_customer.get("email")
         shopify_addresses = shopify_customer.get("addresses", [])
-
+        
         doc.flags.from_shopify = True
-        doc.db_set("shopify_id", shopify_id, update_modified=False)
-        doc.db_set("shopify_email", shopify_email, update_modified=False)
+        doc.db_set("shopify_id", shopify_id)
+        if contact_name:
+            doc.db_set("customer_primary_contact", contact_name)
+        
+        doc.db_set("shopify_email", shopify_email)
 
         def is_same_address(local, shopify):
             return (
@@ -166,94 +180,21 @@ def send_customer_to_shopify_hook(doc, method):
             if not local_addr_doc.shopify_id:
                 for shopify_addr in shopify_addresses:
                     if is_same_address(local_addr_doc, shopify_addr):
-                        local_addr_doc.db_set("shopify_id", shopify_addr.get("id"), update_modified=False)
+                        local_addr_doc.db_set("shopify_id", shopify_addr.get("id"))
                         break
 
     except Exception as e:
         frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
 
-
-def send_address_to_shopify(address_doc, method):
-    shopify_keys = frappe.get_single("Shopify Connector Setting")
-    if not shopify_keys.sync_customer:
-        return
-
-    SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
-    SHOPIFY_STORE_URL = shopify_keys.shop_url
-    SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
-
-    customer_name = None
-    linked_customers = frappe.get_all("Dynamic Link", filters={
-        "link_doctype": "Address",
-        "link_name": address_doc.name,
-        "parenttype": "Customer" 
-    }, fields=["parent"])
-
-    if linked_customers:
-        customer_name = linked_customers[0].get("parent")
-    elif address_doc.get("links"): 
-        for link in address_doc.links:
-            if link.link_doctype == "Customer":
-                customer_name = link.link_name
-                break
-    elif frappe.db.get_value("Customer", {"customer_primary_address": address_doc.name}, "name"):
-         customer_name = frappe.db.get_value("Customer", {"customer_primary_address": address_doc.name}, "name")
-
-
-    if not customer_name:
-        frappe.log_error(f"No linked customer found for Address: {address_doc.name}. Cannot sync to Shopify.", "Shopify Address Sync Error")
-        return
-
-    shopify_customer_id = frappe.db.get_value("Customer", customer_name, "shopify_id")
-    if not shopify_customer_id:
-        return
-
-    data = {
-        "address": {
-            "address1": address_doc.address_line1,
-            "address2": address_doc.address_line2 or "",
-            "city": address_doc.city,
-            "province": address_doc.state or address_doc.custom_state or "",
-            "country": address_doc.country,
-            "zip": address_doc.pincode,
-            "phone": address_doc.phone or "", 
-            "first_name": address_doc.address_title or "", 
-            "last_name": ""
-        }
-    }
-
-    shopify_address_id = address_doc.shopify_id
-
-    headers = {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
-    }
-
-    try:
-        if shopify_address_id:
-            url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses/{shopify_address_id}.json"
-            response = requests.put(url, json=data, headers=headers, timeout=30)
-            action = "updated"
-        else:
-            url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses.json"
-            response = requests.post(url, json=data, headers=headers, timeout=30)
-            action = "created"
-
-        if response.status_code in (200, 201):
-            response_json = response.json()
-            new_shopify_address_id = response_json["customer_address"]["id"]
-            if not shopify_address_id:
-                address_doc.db_set("shopify_id", new_shopify_address_id, update_modified=False)
-            frappe.log_d(f"Shopify customer address {address_doc.name} successfully {action}.")
-        else:
-            frappe.log_error(f"Shopify customer address sync failed for Address {address_doc.name} ({action}): {response.text}", "Shopify Address Sync Error")
-
-    except Exception as e:
-        frappe.log_error(f"Exception during Shopify address sync for {address_doc.name}: {str(e)}", "Shopify Address Sync Error")
-
-
 def on_address_update(doc, method):
-    send_address_to_shopify(doc, method)
+    for link in doc.links:
+        if link.link_doctype == "Customer" and link.link_name:
+            try:
+                customer = frappe.get_doc("Customer", link.link_name)
+                send_customer_to_shopify_hook(customer, "update")
+            except Exception as e:
+                frappe.log_error(f"Error syncing customer from address hook: {str(e)}", "Shopify Sync Error")
+
 
 def send_contact_to_shopify(doc, method):
     data = {
@@ -285,6 +226,7 @@ def send_contact_to_shopify(doc, method):
     if response.status_code not in (200, 201):
         frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
 
+
 def delete_customer_from_shopify(doc, method):
     if not doc.shopify_id:
         return
@@ -302,6 +244,7 @@ def delete_customer_from_shopify(doc, method):
         frappe.log_error(f"Failed to delete customer from Shopify: {response.text}", "Shopify Customer Delete Error")
 
 
+
 def get_current_domain_name() -> str:
     if hasattr(frappe.local, 'request') and frappe.local.request:
         return frappe.local.request.host
@@ -314,9 +257,11 @@ def get_current_domain_name() -> str:
             return "localhost"
 
 def send_item_to_shopify(doc, method):
-    if hasattr(doc.flags, 'from_shopify') and doc.flags.from_shopify:
+    if doc.flags.from_shopify:
         return
-
+    if doc.custom_ignore_product_update:
+        doc.db_set("custom_ignore_product_update", 0)
+        return
     item_triggering_sync = frappe.get_doc("Item", doc.name)
     
     frappe_template_item_name = None
@@ -344,7 +289,7 @@ def send_item_to_shopify(doc, method):
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
-    SHOPIFY_API_VERSION = "2024-01"
+    SHOPIFY_API_VERSION = "2025-04"
 
     product_shopify_id_to_update = parent_doc_for_payload.shopify_id
 
@@ -544,6 +489,16 @@ def send_item_to_shopify(doc, method):
 
     else:
         frappe.log_error(f"Failed to sync product {parent_doc_for_payload.name} to Shopify: Status {response.status_code} - {response.text}", "Shopify Sync Error")
+
+
+
+
+
+
+
+
+
+
 
 
 
