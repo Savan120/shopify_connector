@@ -2,6 +2,14 @@
  "Item": [
   {
    "dt": "Item",
+   "fieldname": "custom_ignore_product_update",
+   "fieldtype": "Check",
+   "insert_after": "custom_variant_id",
+   "label": "Ignore Product Update",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
    "fieldname": "custom_send_to_shopify",
    "fieldtype": "Check",
    "insert_after": "has_variants",
