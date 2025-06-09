@@ -311,16 +311,9 @@ def customer_creation():
     if not shopify_hmac:
         frappe.throw("Unauthorized: Webhook signature missing.")
 
-    calculated_hmac = base64.b64encode(
-        hmac.new(
-            shopify_webhook_secret.encode("utf-8"), request_body, hashlib.sha256
-        ).digest()
-    )
+    calculated_hmac = base64.b64encode(hmac.new(shopify_webhook_secret.encode("utf-8"), request_body, hashlib.sha256).digest())
     if not hmac.compare_digest(calculated_hmac, shopify_hmac.encode("utf-8")):
-        frappe.log_error(
-            f"Webhook signature mismatch. Calculated: {calculated_hmac.decode('utf-8')}, Received: {shopify_hmac}",
-            "Shopify Webhook Error",
-        )
+        frappe.log_error(f"Webhook signature mismatch. Calculated: {calculated_hmac.decode('utf-8')}, Received: {shopify_hmac}","Shopify Webhook Error",)
         frappe.throw("Unauthorized: Invalid webhook signature.")
 
     if shopify_keys.sync_customer:
@@ -412,6 +405,7 @@ def customer_creation():
                 cus_address.flags.ignore_permissions = True
                 cus_address.insert(ignore_mandatory=True)
                 cus_address.save()
+                frappe.db.set_value("Customer", cus.name, "customer_primary_contact", cus_address.name)
                 cus.customer_primary_address = cus_address.name
                 cus.save()
                 
@@ -448,8 +442,7 @@ def customer_creation():
             cus_contact.flags.ignore_permissions = True
             cus_contact.insert(ignore_mandatory=True)
             cus_contact.save()
-                
-            cus.customer_primary_contact = cus_contact.name
+            frappe.db.set_value("Customer", cus.name, "customer_primary_contact", cus_contact.name)
             
             cus.save()
 
@@ -664,7 +657,6 @@ def product_creation():
 
                 variant.flags.ignore_permissions = True
                 variant.flags.from_shopify = True
-                print("variant",item.flags.from_shopify)
                 variant.insert(ignore_mandatory=True)
                 variant.save()
 
@@ -713,7 +705,6 @@ def product_update():
     
     item = frappe.get_doc("Item", item_doc_name)
 
-    # Store the existing HSN code before updating
     existing_hsn_code_parent = item.gst_hsn_code
 
     item_group = order_data.get("product_type") if order_data.get("product_type") else settings_for_secret.item_group
@@ -760,7 +751,7 @@ def product_update():
                 hs.hsn_code = hsn_code_for_parent
                 hs.insert(ignore_permissions=True)
             item.gst_hsn_code = hsn_code_for_parent
-        elif existing_hsn_code_parent: # Use existing HSN if new one not found
+        elif existing_hsn_code_parent:
             item.gst_hsn_code = existing_hsn_code_parent
 
     else:
@@ -807,12 +798,8 @@ def product_update():
 
             
         for v in order_data.get("variants", []):
-            print(">>>>>>>>>>>>>>.", v.get("id"), "\n\n\n\n", v)
-
             variant_erp_doc = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
-            
-            print("Variant ERP Doc!!!!!!!!!!!!!!!!!!!!!!:", variant_erp_doc)
-            
+                        
             if variant_erp_doc:
                 variant = frappe.get_doc("Item", variant_erp_doc)
                 existing_hsn_code_variant = variant.gst_hsn_code
@@ -844,12 +831,9 @@ def product_update():
             inventory_item_id_variant = v.get("inventory_item_id")
             hsn_code_for_variant = None
             if inventory_item_id_variant:
-                print("Fetching HSN code f>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>:", existing_hsn_code_variant)
                 hsn_code_for_variant = get_hsn_from_shopify(inventory_item_id_variant, settings_for_secret, existing_hsn_code_variant)
-                print("HSN Code fetched for variant:", hsn_code_for_variant)
             
             if hsn_code_for_variant:
-                print("HSN Code from Shopify:", hsn_code_for_variant)
                 if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code_for_variant}):
                     hs = frappe.new_doc("GST HSN Code")
                     hs.hsn_code = hsn_code_for_variant
@@ -883,7 +867,6 @@ def product_update():
 
 
 def get_hsn_from_shopify(inventory_item_id, settings,existing_hsn_code_variant=None):
-    print(inventory_item_id, settings)
     inventory_item_id = str(inventory_item_id)
     if isinstance(settings, str):
         try:
@@ -898,20 +881,18 @@ def get_hsn_from_shopify(inventory_item_id, settings,existing_hsn_code_variant=N
         "X-Shopify-Access-Token": settings.access_token,
         "Content-Type": "application/json",
     }
-    # try:
-    response = requests.get(url, headers=headers)
-    print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>",response.json())
-    if response.status_code == 200:
-        inventory_item = response.json().get("inventory_item", {})
-        hsn_code = inventory_item.get("harmonized_system_code")
-        print("HSN Code fetched from Shopify:", hsn_code)
-        return hsn_code
-    else:
-        return existing_hsn_code_variant
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            inventory_item = response.json().get("inventory_item", {})
+            hsn_code = inventory_item.get("harmonized_system_code")
+            return hsn_code
+        else:
+            return existing_hsn_code_variant
 
-    # except Exception as e:
-    #     frappe.log_error(f"HSN Fetch Error: {str(e)}", "Shopify HSN Fetch")
-    #     return None
+    except Exception as e:
+        frappe.log_error(f"HSN Fetch Error: {str(e)}", "Shopify HSN Fetch")
+        return None
 
 @frappe.whitelist(allow_guest=True)
 def get_inventory_level():
@@ -1121,13 +1102,9 @@ def customer_update():
             address_data = order_data.get("default_address")
             address = None
 
-            if customer.customer_primary_address:
-                address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
-                frappe.log_error("Address found in ERPNext111111:", address)
-                address = frappe.get_doc("Address", address)
-                frappe.log_error(f"Address found>>>>>>>>>>>>>>>>>>>>>>>>>>>: {address.name}")
+            address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
+            address = frappe.get_doc("Address", address)
             if not address:
-                frappe.log_error(f"Creating new address for customer3333333333: {customer.name}")
                 address = frappe.new_doc("Address")
                 address.shopify_id = address_data.get("id")
                 address.address_title = customer.name
@@ -1145,7 +1122,6 @@ def customer_update():
                     "link_doctype": "Customer",
                     "link_name": customer.name,
                 })
-                frappe.log_error(f"Address created4444444444: {address.name}")
             address.update({
                 "address_line1": address_data.get("address1"),
                 "address_type" : "Shipping",
@@ -1158,11 +1134,9 @@ def customer_update():
                 "address_title": f"{address_data.get('first_name', '')} {address_data.get('last_name', '')}",
                 "address_type": "Shipping"
             })
-            frappe.log_error(f"Address updated5555555555555: {address.name}")
             address.flags.ignore_permissions = True
             address.save(ignore_permissions=True)
-            customer.customer_primary_address = address.name
-            frappe.log_error(f"Customer primary address updated66666666666: {address.name}")
+            frappe.db.set_value("Customer", customer.name, "customer_primary_address", address.name)
 
             contact = None
             if customer.customer_primary_contact:
@@ -1189,7 +1163,7 @@ def customer_update():
                 })
                 contact.flags.ignore_permissions = True
                 contact.save(ignore_permissions=True)
-                customer.customer_primary_contact = contact.name
+                frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)                
             else:
                 contact.update({
                     "first_name": address_data.get("first_name"),

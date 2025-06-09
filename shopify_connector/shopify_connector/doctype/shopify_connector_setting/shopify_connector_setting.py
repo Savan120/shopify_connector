@@ -30,7 +30,7 @@ class ShopifyConnectorSetting(Document):
     def before_validate(self):
         if self.enable_shopify and not self.flags.ignore_validate:
             setup_custom_fields()
-            product_creation()
+            # product_creation()
             customer_creation() 
             enqueue_get_order_from_shopify() 
             # create_delete_custom_fields(self)
@@ -457,20 +457,26 @@ def customer_creation():
     order_data = response.json()
             
     customer_data = order_data.get("customers", [])
-    for order_data in customer_data:    
-        # tag = ""
-        # if not frappe.db.exists("Customer Group", {"customer_group_name": order_data.get("tags")}):
-        #     customer_group = frappe.new_doc("Customer Group")
-        #     customer_group.name = tag
-        #     customer_group.customer_group_name = tag
-        #     customer_group.flags.ignore_permissions = True
-        #     print(customer_group.__dict__)
-        #     customer_group.insert(ignore_permissions=True)
+    for order_data in customer_data:   
+        print(order_data) 
+        tag_name = (order_data.get("tags") or "").strip()
 
-        #     tag = customer_group.name
+        if not tag_name:
+            tag = shopify_keys.customer_group
+        else:
+            existing_customer_group = frappe.db.get_value("Customer Group", {"customer_group_name": tag_name}, "name")
+
+            if existing_customer_group:
+                tag = existing_customer_group
+            else:
+                customer_group = frappe.new_doc("Customer Group")
+                customer_group.customer_group_name = tag_name
+                customer_group.flags.ignore_permissions = True
+                customer_group.insert(ignore_permissions=True)
+
+                tag = customer_group.name
+
         
-        # if not tag:
-        #     tag = shopify_keys.customer_group    
         first_name = order_data.get("first_name")
         last_name = order_data.get("last_name")
         
@@ -482,7 +488,7 @@ def customer_creation():
         if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}):
             cus = frappe.new_doc("Customer")
             cus.flags.from_shopify = True
-            cus.shopify_email = order_data.get("email")
+            cus.shopify_email = order_data.get("email") or ""
             cus.shopify_id = order_data.get("id")
             cus.customer_name = customer_name
             cus.customer_group = shopify_keys.customer_group or tag

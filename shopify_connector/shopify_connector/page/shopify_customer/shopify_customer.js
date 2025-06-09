@@ -87,7 +87,7 @@ frappe.pages['shopify-customer'].on_page_load = function(wrapper) {
             <table class="table-bordered">
                 <thead>
                     <tr class='table-bordered th'>
-                        <th>Customer Name</th> <th>Shopify Email</th>
+                        <th>Customer Name</th> <th>Shopify ID</th> <th>Shopify Email</th>
                         </tr>
                 </thead>
                 <tbody>`;
@@ -103,7 +103,6 @@ frappe.pages['shopify-customer'].on_page_load = function(wrapper) {
                 </tbody>
             </table>`;
 
-        // Add the total count above the table
         var totalCountHtml = `<p class='total-count'>Total Synced Customers: ${syncedCustomers[1]}</p>`;
         $(page.body).html(totalCountHtml + tableHtml);
     }
