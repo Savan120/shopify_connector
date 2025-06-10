@@ -296,6 +296,7 @@ def link_customer_and_address(raw_shipping_data, customer_name, contact_email):
 
 @frappe.whitelist(allow_guest=True)
 def customer_creation():
+    frappe.log_error(title="Customer Creation", message="Called")
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     shopify_webhook_secret = shopify_keys.shopify_webhook_secret
 
@@ -323,7 +324,7 @@ def customer_creation():
                 return
 
         order_data = frappe.parse_json(request_body.decode("utf-8"))
-       
+        frappe.log_error(title="Order Data", message=f"{order_data}")
 
         customer_id = order_data.get("id")
         first_name = order_data.get("first_name")
@@ -348,8 +349,10 @@ def customer_creation():
 
         response = requests.post(f'https://{shopify_keys.shop_url}/admin/api/{shopify_keys.shopify_api_version}/graphql.json', headers=headers, json=json_data)
         response_data = response.json()
+        frappe.log_error(title="Response 111Dataa", message=f"{response_data}")
         tag = ""
         if response_data.get("data", {}).get("customer", {}):
+            frappe.log_error(title="response_data", message=f"{response_data}")
             tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
             if tags:
                 tag = tags[0]
@@ -378,6 +381,7 @@ def customer_creation():
             else:
                 cus.territory = shopify_keys.territory 
             cus.save()
+            frappe.log_error(title="Customer", message=f"{cus.__dict__}")
             if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
                 address = order_data.get("default_address")
                 cus_address = frappe.new_doc("Address")
