@@ -13,7 +13,6 @@ def send_customer_to_shopify_hook_delayed(doc,method):
     
     
 def send_customer_to_shopify_hook(doc, method):
-
     if doc.flags.from_shopify:
         return
 

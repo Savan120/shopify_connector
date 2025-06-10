@@ -455,7 +455,8 @@ def customer_creation():
                     order_data.get("email")
                 )
             )
-
+    else :
+        return
 
 @frappe.whitelist(allow_guest=True)
 def product_creation():

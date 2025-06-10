@@ -30,7 +30,7 @@ class ShopifyConnectorSetting(Document):
     def before_validate(self):
         if self.enable_shopify and not self.flags.ignore_validate:
             setup_custom_fields()
-            # product_creation()
+            product_creation()
             customer_creation() 
             enqueue_get_order_from_shopify() 
             # create_delete_custom_fields(self)
@@ -214,7 +214,6 @@ def sync_shopify_locations():
     url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
 
     response = requests.get(url, headers=headers, verify=False)
-    print(response.json())
     if response.status_code == 200:
         locations = response.json().get("locations", [])
 
@@ -268,7 +267,6 @@ def get_sales_order():
 
     data = response.json()
     orderdata = data.get("orders", [])
-    # print("\n\n\n\n\n>>>>>>>>>>",order_data)
     for order_data in orderdata:
         try:
             settings = frappe.get_doc("Shopify Connector Setting")
