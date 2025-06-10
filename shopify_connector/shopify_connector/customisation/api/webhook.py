@@ -1083,6 +1083,11 @@ def customer_update():
         customer.flags.ignore_permissions = True
         customer.insert(ignore_mandatory=True)
         customer.save()
+        if frappe.db.exists("Territory", order_data.get("default_address", {}).get("province")):
+            customer.territory = order_data.get("default_address", {}).get("province")
+        else:
+            customer.territory = settings.territory 
+        customer.save()
         
     state = ""
     pincode = ""
@@ -1172,8 +1177,9 @@ def customer_update():
             "link_name": customer.name,
         })
         contact.flags.ignore_permissions = True
-        contact.save()
+        contact.insert(ignore_permissions=True)
         frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
+        contact.save()
     else:
         contact.update({
             "first_name": address_data.get("first_name"),
