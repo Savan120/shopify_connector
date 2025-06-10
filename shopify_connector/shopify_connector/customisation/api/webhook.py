@@ -1090,7 +1090,7 @@ def customer_update():
 
             address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
             if not address:
-                address = frappe.db.get_value("Dynamic Link", {"link_doctype": "Customer", "link_name": customer.name}, "parent")
+                address = frappe.db.get_value("Dynamic Link", {"link_doctype": "Customer", "link_name": customer.name, "parenttype": "Address"}, "parent")
             if address:
                 address = frappe.get_doc("Address", address)
             else:
@@ -1184,14 +1184,6 @@ def customer_update():
         
     else:
         frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
-
-
-
-
-
-
-
-
 
 
 
