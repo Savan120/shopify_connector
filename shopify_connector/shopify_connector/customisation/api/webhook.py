@@ -322,14 +322,8 @@ def customer_creation():
             if getattr(doc.flags, "from_shopify", False):
                 return
 
-        try:
-            order_data = frappe.parse_json(request_body.decode("utf-8"))
-        except Exception as e:
-            frappe.log_error(
-                f"Failed to parse JSON from request body: {e}", "Shopify Webhook Error"
-            )
-            frappe.throw("Invalid JSON payload.")
-
+        order_data = frappe.parse_json(request_body.decode("utf-8"))
+       
 
         customer_id = order_data.get("id")
         first_name = order_data.get("first_name")
@@ -355,14 +349,15 @@ def customer_creation():
         response = requests.post(f'https://{shopify_keys.shop_url}/admin/api/{shopify_keys.shopify_api_version}/graphql.json', headers=headers, json=json_data)
         response_data = response.json()
         tag = ""
-        tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
-        if tags:
-            tag = tags[0]
-            if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
-                customer_group = frappe.new_doc("Customer Group")
-                customer_group.customer_group_name = tag
-                customer_group.flags.ignore_permissions = True
-                customer_group.insert(ignore_permissions=True)
+        if response_data.get("data", {}).get("customer", {}):
+            tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
+            if tags:
+                tag = tags[0]
+                if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
+                    customer_group = frappe.new_doc("Customer Group")
+                    customer_group.customer_group_name = tag
+                    customer_group.flags.ignore_permissions = True
+                    customer_group.insert(ignore_permissions=True)
         else:
             tag = shopify_keys.customer_group
             
@@ -443,8 +438,6 @@ def customer_creation():
             cus_contact.insert(ignore_mandatory=True)
             cus_contact.save()
             frappe.db.set_value("Customer", cus.name, "customer_primary_contact", cus_contact.name)
-            
-            cus.save()
 
             frappe.msgprint(
                 _("Customer created for email: {0}").format(order_data.get("email"))
@@ -1017,11 +1010,7 @@ def customer_update():
     except Exception as e:
         frappe.throw(_(f"Webhook verification error: {e}"))
 
-    try:
-        order_data = frappe.parse_json(raw_request_body.decode("utf-8"))
-    except Exception as e:
-        frappe.log_error(f"Failed to parse JSON: {e}", "Shopify Webhook Error")
-        frappe.throw(_("Invalid JSON payload."))
+    order_data = frappe.parse_json(raw_request_body.decode("utf-8"))
 
     user = frappe.session.user = settings.webhook_session_user 
     if not user:
@@ -1085,8 +1074,8 @@ def customer_update():
             state = order_data.get("default_address").get("province") 
             pincode = order_data.get("default_address").get("zip")
 
+        address_data = order_data.get("default_address")
         if state and pincode:
-            address_data = order_data.get("default_address")
             address = None
 
             address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
@@ -1127,62 +1116,63 @@ def customer_update():
             address.flags.ignore_permissions = True
             address.save()
             frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name, update_modified = False)
-            contact = None
-            contact_name = frappe.db.get_value(
-                "Dynamic Link",
-                {
-                    "link_doctype": "Customer",
-                    "link_name": customer.name,
-                    "parenttype": "Contact"
-                },
-                "parent"
-            )
+        contact = None
+        contact_name = frappe.db.get_value(
+            "Dynamic Link",
+            {
+                "link_doctype": "Customer",
+                "link_name": customer.name,
+                "parenttype": "Contact"
+            },
+            "parent"
+        )
 
-            if contact_name:
-                contact = frappe.get_doc("Contact", contact_name)
+        if contact_name:
+            contact = frappe.get_doc("Contact", contact_name)
 
-            if not contact:
-                contact = frappe.new_doc("Contact")
-                contact.first_name = address_data.get("first_name")
-                contact.middle_name = address_data.get("middle_name") or ""
-                contact.last_name = address_data.get("last_name")
-                if order_data.get("email"):
-                    contact.append("email_ids", {
-                        "email_id": order_data.get("email"),
-                        "is_primary": 1,
-                    })
-                if order_data.get("phone"):
-                    contact.append("phone_nos", {
-                        "phone": order_data.get("phone"),
-                        "is_primary_phone": 1,
-                    })
-                contact.append("links", {
-                    "link_doctype": "Customer",
-                    "link_name": customer.name,
+        if not contact:
+            contact = frappe.new_doc("Contact")
+            contact.first_name = address_data.get("first_name")
+            contact.middle_name = address_data.get("middle_name") or ""
+            contact.last_name = address_data.get("last_name")
+            if order_data.get("email"):
+                contact.append("email_ids", {
+                    "email_id": order_data.get("email"),
+                    "is_primary": 1,
                 })
-                contact.flags.ignore_permissions = True
-                contact.save()
-                frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
-            else:
-                contact.update({
-                    "first_name": address_data.get("first_name"),
-                    "middle_name": address_data.get("middle_name") or "",
-                    "last_name": address_data.get("last_name")
+            if order_data.get("phone"):
+                contact.append("phone_nos", {
+                    "phone": order_data.get("phone"),
+                    "is_primary_phone": 1,
+                    "is_primary_mobile_no":1
                 })
-                if order_data.get("email"):
-                    contact.set("email_ids", [{
-                        "email_id": order_data.get("email"),
-                        "is_primary": 1
-                    }])
-                if order_data.get("phone"):
-                    contact.set("phone_nos", [{
-                        "phone": order_data.get("phone"),
-                        "is_primary_phone": 1
-                    }])
-                contact.flags.ignore_permissions = True
-                contact.save()
-                frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
-        
+            contact.append("links", {
+                "link_doctype": "Customer",
+                "link_name": customer.name,
+            })
+            contact.flags.ignore_permissions = True
+            contact.save()
+            frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
+        else:
+            contact.update({
+                "first_name": address_data.get("first_name"),
+                "middle_name": address_data.get("middle_name") or "",
+                "last_name": address_data.get("last_name")
+            })
+            if order_data.get("email"):
+                contact.set("email_ids", [{
+                    "email_id": order_data.get("email"),
+                    "is_primary": 1
+                }])
+            if order_data.get("phone"):
+                contact.set("phone_nos", [{
+                    "phone": order_data.get("phone"),
+                    "is_primary_phone": 1,
+                    "is_primary_mobile_no":1
+                }])
+            contact.flags.ignore_permissions = True
+            contact.save()
+    
     else:
         frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
 

@@ -122,6 +122,7 @@ def send_customer_to_shopify_hook(doc, method):
         }
     }
 
+    frappe.log_error(title="Customer Payload", message=f"{customer_payload}")
     try:
         headers = {
             "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
