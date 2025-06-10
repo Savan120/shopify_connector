@@ -363,7 +363,6 @@ def customer_creation():
                     customer_group.insert(ignore_permissions=True)
         else:
             tag = shopify_keys.customer_group
-            
 
         if not frappe.db.exists("Customer", {"shopify_email": order_data.get("email")}) and not frappe.db.exists("Customer", {"shopify_id": customer_id}):
             cus = frappe.new_doc("Customer")
@@ -1052,19 +1051,19 @@ def customer_update():
     if not shopify_id:
         frappe.throw(_("Shopify customer ID is missing in the payload."))
 
+    customer_name = ""
+    if order_data.get("first_name") or order_data.get("last_name"):
+        customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
+    if not order_data.get("last_name"):
+        customer_name = order_data.get("first_name")
+        
     if frappe.db.exists("Customer", {"shopify_id": shopify_id}):
         customer = frappe.get_doc("Customer", {"shopify_id": shopify_id})
 
         if not customer:
             frappe.msgprint(_("Customer not found with Shopify ID."))
             return
-
         customer.flags.ignore_permissions = True
-        customer_name = ""
-        if order_data.get("first_name") or order_data.get("last_name"):
-            customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
-        if not order_data.get("last_name"):
-            customer_name = order_data.get("first_name")
         customer.customer_name = customer_name
         customer.shopify_email = order_data.get("email")
         customer.customer_group = tag
@@ -1072,113 +1071,129 @@ def customer_update():
         customer.custom_ignore_address_update = True
         customer.flags.from_shopify = True
         customer.save()
-        state = ""
-        pincode = ""
-        if order_data.get("default_address"):
-            state = order_data.get("default_address").get("province") 
-            pincode = order_data.get("default_address").get("zip")
+    else :
+        customer= frappe.new_doc("Customer")
+        customer.customer_name = customer_name
+        customer.shopify_id = order_data.get("id")
+        customer.shopify_email = order_data.get("email") or ""
+        customer.customer_group = tag
+        customer.default_currency= order_data.get("currency")
+        customer.custom_ignore_address_update = True
+        customer.flags.from_shopify = True
+        customer.flags.ignore_permissions = True
+        customer.insert(ignore_mandatory=True)
+        customer.save()
+        
+    state = ""
+    pincode = ""
+    if order_data.get("default_address"):
+        state = order_data.get("default_address").get("province") 
+        pincode = order_data.get("default_address").get("zip")
 
-        address_data = order_data.get("default_address")
-        if state and pincode:
-            address = None
+    address_data = order_data.get("default_address")
+    print(address_data)
+    if state and pincode:
 
-            address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
-            if not address:
-                address = frappe.db.get_value("Dynamic Link", {"link_doctype": "Customer", "link_name": customer.name, "parenttype": "Address"}, "parent")
-            if address:
-                address = frappe.get_doc("Address", address)
-            else:
-                address = frappe.new_doc("Address")
-                address.address_title = customer.name
-                address.address_type = "Shipping"
-                address.address_line1 = address_data.get("address1")
-                address.address_line2 = address_data.get("address2")
-                address.city = address_data.get("city")
-                address.state = address_data.get("province")
-                address.country = address_data.get("country")
-                address.pincode = address_data.get("zip")
-                address.phone = address_data.get("phone")
-                address.first_name = address_data.get("first_name")
-                address.last_name = address_data.get("last_name")
-                address.append("links", {
-                    "link_doctype": "Customer",
-                    "link_name": customer.name,
-                })
-            address.update({
-                "shopify_id": address_data.get("id"),
-                "address_line1": address_data.get("address1"),
-                "address_type" : "Shipping",
-                "address_line2": address_data.get("address2"),
-                "city": address_data.get("city"),
-                "state": address_data.get("province"),
-                "country": address_data.get("country"),
-                "pincode": address_data.get("zip"),
-                "phone": address_data.get("phone"),
-                "address_title": f"{address_data.get('first_name', '')}",
-                "address_type": "Shipping"
-            })
-            address.flags.ignore_permissions = True
-            address.save()
-            frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name, update_modified = False)
-        contact = None
-        contact_name = frappe.db.get_value(
-            "Dynamic Link",
-            {
-                "link_doctype": "Customer",
-                "link_name": customer.name,
-                "parenttype": "Contact"
-            },
-            "parent"
-        )
-
-        if contact_name:
-            contact = frappe.get_doc("Contact", contact_name)
-
-        if not contact:
-            contact = frappe.new_doc("Contact")
-            contact.first_name = address_data.get("first_name")
-            contact.middle_name = address_data.get("middle_name") or ""
-            contact.last_name = address_data.get("last_name")
-            if order_data.get("email"):
-                contact.append("email_ids", {
-                    "email_id": order_data.get("email"),
-                    "is_primary": 1,
-                })
-            if order_data.get("phone"):
-                contact.append("phone_nos", {
-                    "phone": order_data.get("phone"),
-                    "is_primary_phone": 1,
-                    "is_primary_mobile_no":1
-                })
-            contact.append("links", {
-                "link_doctype": "Customer",
-                "link_name": customer.name,
-            })
-            contact.flags.ignore_permissions = True
-            contact.save()
-            frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
+        address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
+        if not address:
+            address = frappe.db.get_value("Dynamic Link", {"link_doctype": "Customer", "link_name": customer.name, "parenttype": "Address"}, "parent")
+        if address:
+            address = frappe.get_doc("Address", address)
         else:
-            contact.update({
-                "first_name": address_data.get("first_name"),
-                "middle_name": address_data.get("middle_name") or "",
-                "last_name": address_data.get("last_name")
+            address = frappe.new_doc("Address")
+            address.address_title = customer.name
+            address.address_type = "Shipping"
+            address.shopify_id = address_data.get("id")
+            address.address_line1 = address_data.get("address1") or address_data.get("address2")
+            address.address_line2 = address_data.get("address2")
+            address.city = address_data.get("city")
+            address.state = address_data.get("province")
+            address.country = address_data.get("country")
+            address.pincode = address_data.get("zip")
+            address.phone = address_data.get("phone")
+            address.first_name = address_data.get("first_name")
+            address.last_name = address_data.get("last_name")
+            address.append("links", {
+                "link_doctype": "Customer",
+                "link_name": customer.name,
             })
-            if order_data.get("email"):
-                contact.set("email_ids", [{
-                    "email_id": order_data.get("email"),
-                    "is_primary": 1
-                }])
-            if order_data.get("phone"):
-                contact.set("phone_nos", [{
-                    "phone": order_data.get("phone"),
-                    "is_primary_phone": 1,
-                    "is_primary_mobile_no":1
-                }])
-            contact.flags.ignore_permissions = True
-            contact.save()
-    
+            address.flags.ignore_permission= True
+            address.insert(ignore_permissions=True)
+            address.save()
+            
+        address.update({
+            "shopify_id": address_data.get("id"),
+            "address_line1": address_data.get("address1"),
+            "address_type" : "Shipping",
+            "address_line2": address_data.get("address2"),
+            "city": address_data.get("city"),
+            "state": address_data.get("province"),
+            "country": address_data.get("country"),
+            "pincode": address_data.get("zip"),
+            "phone": address_data.get("phone"),
+            "address_title": f"{address_data.get('first_name', '')}",
+            "address_type": "Shipping"
+        })
+        address.flags.ignore_permissions = True
+        address.save()
+        frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name, update_modified = False)
+    contact = None
+    contact_name = frappe.db.get_value(
+        "Dynamic Link",
+        {
+            "link_doctype": "Customer",
+            "link_name": customer.name,
+            "parenttype": "Contact"
+        },
+        "parent"
+    )
+
+    if contact_name:
+        contact = frappe.get_doc("Contact", contact_name)
+
+    if not contact:
+        contact = frappe.new_doc("Contact")
+        contact.first_name = address_data.get("first_name")
+        contact.middle_name = address_data.get("middle_name") or ""
+        contact.last_name = address_data.get("last_name")
+        if order_data.get("email"):
+            contact.append("email_ids", {
+                "email_id": order_data.get("email"),
+                "is_primary": 1,
+            })
+        if order_data.get("phone"):
+            contact.append("phone_nos", {
+                "phone": order_data.get("phone"),
+                "is_primary_phone": 1,
+                "is_primary_mobile_no":1
+            })
+        contact.append("links", {
+            "link_doctype": "Customer",
+            "link_name": customer.name,
+        })
+        contact.flags.ignore_permissions = True
+        contact.save()
+        frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
     else:
-        frappe.msgprint(_("Customer does not exist for email: {0}").format(order_data.get("email")))
+        contact.update({
+            "first_name": address_data.get("first_name"),
+            "middle_name": address_data.get("middle_name") or "",
+            "last_name": address_data.get("last_name")
+        })
+        if order_data.get("email"):
+            contact.set("email_ids", [{
+                "email_id": order_data.get("email"),
+                "is_primary": 1
+            }])
+        if order_data.get("phone"):
+            contact.set("phone_nos", [{
+                "phone": order_data.get("phone"),
+                "is_primary_phone": 1,
+                "is_primary_mobile_no":1
+            }])
+        contact.flags.ignore_permissions = True
+        contact.save()
+
 
 
 

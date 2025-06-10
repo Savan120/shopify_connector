@@ -439,7 +439,6 @@ def create_sales_invoice(so):
 def customer_creation():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if shopify_keys.sync_customer:
-        SHOPIFY_API_KEY = shopify_keys.api_key
         SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
         SHOPIFY_STORE_URL = shopify_keys.shop_url
         SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
@@ -450,7 +449,7 @@ def customer_creation():
         }
 
         url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers.json"
-
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>",url)
         response = requests.get(url, headers=headers, verify=False)
         if response.status_code != 200:
             frappe.throw(f"Failed to fetch product data: {response.text}")
@@ -458,7 +457,8 @@ def customer_creation():
         order_data = response.json()
                 
         customer_data = order_data.get("customers", [])
-        for order_data in customer_data:   
+        for order_data in customer_data:  
+            print(order_data) 
             tag_name = (order_data.get("tags") or "").strip()
 
             if not tag_name:
@@ -479,11 +479,13 @@ def customer_creation():
             
             first_name = order_data.get("first_name")
             last_name = order_data.get("last_name")
-            
+            customer_name=""
             if last_name:
                 customer_name =f"{first_name} {last_name}".strip()
             else:
                 customer_name = first_name
+                
+            print(customer_name)
                 
             if not frappe.db.exists("Customer", {"shopify_id": order_data.get("id")}):
                 cus = frappe.new_doc("Customer")
