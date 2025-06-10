@@ -129,7 +129,7 @@ doc_events = {
         "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_customer_from_shopify",
     },
     "Address": {
-        "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.on_address_update",
+        "validate": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.on_address_update",
         # "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_address_from_shopify",
     },
     "Contact": {

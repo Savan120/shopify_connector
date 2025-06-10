@@ -156,21 +156,16 @@ def send_customer_to_shopify_hook(doc, method):
         frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
 
 
-def on_address_update(doc, method):
-    payload = [{
-        "address1": doc.address_line1,
-        "address2": doc.address_line2 or "",
-        "city": doc.city,
-        "province": doc.state or doc.custom_state or "",
-        "country": doc.country,
-        "zip": doc.pincode,
-        "phone": doc.phone,
-        "email": doc.email_id
-    }]
-    
-    data = {
-        "customer":{
-            "addresses": payload
+def on_address_update(doc, method):    
+    address_payload = {
+        "address": {
+            "address1": doc.address_line1,
+            "address2": doc.address_line2 or "",
+            "city": doc.city,
+            "province": doc.state or doc.custom_state or "",
+            "country": doc.country,
+            "zip": doc.pincode,
+            "phone": doc.phone
         }
     }
 
@@ -187,17 +182,29 @@ def on_address_update(doc, method):
         for row in doc.links:
             if row.link_doctype == "Customer":
                 shopify_customer_id = frappe.db.get_value("Customer", row.link_name, "shopify_id")
+                if shopify_customer_id:
+                    break
 
-    url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}.json"
+    if not shopify_customer_id:
+        frappe.log_error("Shopify customer ID not found for address update.", "Shopify Sync Error")
+        return
+
+    shopify_address_id = frappe.db.get_value("Address", doc.name, "shopify_id")
+    if not shopify_address_id:
+        frappe.log_error(f"Shopify address ID not found for address '{doc.name}'. Cannot update.", "Shopify Sync Error")
+        return
+
+    url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses/{shopify_address_id}.json"
     headers = {
         "Content-Type": "application/json",
         "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
     }
 
-    response = requests.put(url, json=data, headers=headers)
-    if response.status_code not in (200, 201):
-        frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
+    response = requests.put(url, headers=headers, json=address_payload)
+    response.raise_for_status()
 
+    updated_data = response.json()
+    frappe.msgprint(f"Shopify address updated successfully: {updated_data['customer_address']['id']}")
 def send_contact_to_shopify(doc, method):
     data = {
         "customer": {
