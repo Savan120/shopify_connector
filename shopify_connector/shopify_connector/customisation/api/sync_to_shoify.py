@@ -10,8 +10,6 @@ def enqueue_send_customer_to_shopify(doc, method):
 def send_customer_to_shopify_hook_delayed(doc,method):
     send_customer_to_shopify_hook(doc, "after_insert")
     
-    
-    
 def send_customer_to_shopify_hook(doc, method):
     if doc.flags.from_shopify:
         return
@@ -173,11 +171,17 @@ def on_address_update(doc, method):
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_customer:
         return
+    
 
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
     SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
 
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
+    }
+    
     shopify_customer_id = frappe.db.get_value("Customer", {"customer_primary_address": doc.name}, "shopify_id")
     if not shopify_customer_id:
         for row in doc.links:
@@ -189,23 +193,29 @@ def on_address_update(doc, method):
     if not shopify_customer_id:
         frappe.log_error("Shopify customer ID not found for address update.", "Shopify Sync Error")
         return
-
+    
     shopify_address_id = frappe.db.get_value("Address", doc.name, "shopify_id")
     if not shopify_address_id:
+        url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses.json"
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        print("\nn\n\n\n",response.json())
+        addresses = response.json().get("addresses", [])
+        shopify_address_id = addresses[0]["id"] if addresses else None
+        frappe.db.set_value("Address", doc.name, "shopify_id", shopify_address_id)
+    
+    else :
         frappe.log_error(f"Shopify address ID not found for address '{doc.name}'. Cannot update.", "Shopify Sync Error")
         return
 
     url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses/{shopify_address_id}.json"
-    headers = {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
-    }
-
+    
     response = requests.put(url, headers=headers, json=address_payload)
     response.raise_for_status()
 
     updated_data = response.json()
     frappe.msgprint(f"Shopify address updated successfully: {updated_data['customer_address']['id']}")
+    
 def send_contact_to_shopify(doc, method):
     data = {
         "customer": {
@@ -271,6 +281,7 @@ def get_current_domain_name() -> str:
 def send_item_to_shopify(doc, method):
     if doc.flags.from_shopify:
         return
+    print("||||||||||||||||||||",doc.custom_ignore_product_update)
     if doc.custom_ignore_product_update:
         doc.db_set("custom_ignore_product_update", 0)
         return
