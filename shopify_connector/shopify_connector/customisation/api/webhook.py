@@ -324,7 +324,6 @@ def customer_creation():
                 return
 
         order_data = frappe.parse_json(request_body.decode("utf-8"))
-        frappe.log_error(title="Order Data", message=f"{order_data}")
 
         customer_id = order_data.get("id")
         first_name = order_data.get("first_name")
@@ -349,7 +348,6 @@ def customer_creation():
 
         response = requests.post(f'https://{shopify_keys.shop_url}/admin/api/{shopify_keys.shopify_api_version}/graphql.json', headers=headers, json=json_data)
         response_data = response.json()
-        frappe.log_error(title="Response 111Dataa", message=f"{response_data}")
         tag = ""
         if response_data.get("data", {}).get("customer", {}):
             frappe.log_error(title="response_data", message=f"{response_data}")
@@ -380,7 +378,6 @@ def customer_creation():
             else:
                 cus.territory = shopify_keys.territory 
             cus.save()
-            frappe.log_error(title="Customer", message=f"{cus.__dict__}")
             if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
                 address = order_data.get("default_address")
                 cus_address = frappe.new_doc("Address")
@@ -1096,7 +1093,6 @@ def customer_update():
         pincode = order_data.get("default_address").get("zip")
 
     address_data = order_data.get("default_address")
-    print(address_data)
     if state and pincode:
 
         address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
@@ -1106,7 +1102,7 @@ def customer_update():
             address = frappe.get_doc("Address", address)
         else:
             address = frappe.new_doc("Address")
-            address.address_title = customer.name
+            address.address_title = address_data.get("first_name")
             address.address_type = "Shipping"
             address.shopify_id = address_data.get("id")
             address.address_line1 = address_data.get("address1") or address_data.get("address2")

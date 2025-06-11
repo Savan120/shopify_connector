@@ -159,6 +159,7 @@ def send_customer_to_shopify_hook(doc, method):
 def on_address_update(doc, method):    
     address_payload = {
         "address": {
+            "first_name": doc.address_title,
             "address1": doc.address_line1,
             "address2": doc.address_line2 or "",
             "city": doc.city,
