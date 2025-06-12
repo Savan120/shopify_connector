@@ -199,7 +199,6 @@ def on_address_update(doc, method):
         url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses.json"
         response = requests.get(url, headers=headers)
         response.raise_for_status()
-        print("\nn\n\n\n",response.json())
         addresses = response.json().get("addresses", [])
         shopify_address_id = addresses[0]["id"] if addresses else None
         frappe.db.set_value("Address", doc.name, "shopify_id", shopify_address_id)
@@ -267,6 +266,7 @@ def delete_customer_from_shopify(doc, method):
 
 
 
+
 def get_current_domain_name() -> str:
     if hasattr(frappe.local, 'request') and frappe.local.request:
         return frappe.local.request.host
@@ -281,10 +281,15 @@ def get_current_domain_name() -> str:
 def send_item_to_shopify(doc, method):
     if doc.flags.from_shopify:
         return
-    print("||||||||||||||||||||",doc.custom_ignore_product_update)
+    
     if doc.custom_ignore_product_update:
         doc.db_set("custom_ignore_product_update", 0)
         return
+    
+    shopify_keys = frappe.get_single("Shopify Connector Setting")
+    if not shopify_keys.sync_product:
+        return
+    
     item_triggering_sync = frappe.get_doc("Item", doc.name)
     
     frappe_template_item_name = None
@@ -304,11 +309,9 @@ def send_item_to_shopify(doc, method):
         return
 
     if not parent_doc_for_payload.custom_send_to_shopify:
-        print(f"Skipping sync for product '{parent_doc_for_payload.name}': Parent's custom_send_to_shopify is not checked.")
         return
 
     site_url = get_current_domain_name()
-    shopify_keys = frappe.get_single("Shopify Connector Setting")
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
@@ -373,7 +376,6 @@ def send_item_to_shopify(doc, method):
 
         variants_to_send_to_shopify = []
         images_to_send_to_shopify = []
-
         position_counter = 1
 
         for variant_frappe in all_variant_items_from_frappe:
@@ -415,10 +417,10 @@ def send_item_to_shopify(doc, method):
 
             variants_to_send_to_shopify.append(variant_data)
 
-            if variant_doc.image:
+            if variant_doc.image and variant_doc.custom_variant_id:
                 variant_image_url = site_url + variant_doc.image
                 if {"src": variant_image_url} not in images_to_send_to_shopify and {"src": variant_image_url} not in product_payload["product"]["images"]:
-                    images_to_send_to_shopify.append({"src": variant_image_url})
+                    images_to_send_to_shopify.append({"src": variant_image_url, "variant_ids": [variant_doc.custom_variant_id]})
 
         product_payload["product"]["images"].extend(images_to_send_to_shopify)
         product_payload["product"]["variants"] = variants_to_send_to_shopify
@@ -433,14 +435,12 @@ def send_item_to_shopify(doc, method):
                 for existing_option in existing_shopify_product["options"]:
                     if existing_option["name"] == attr:
                         if existing_option.get("values"):
-                             product_payload["product"]["options"].append(existing_option)
+                            product_payload["product"]["options"].append(existing_option)
                         else:
                             product_payload["product"]["options"].append({"name": existing_option["name"], "values": []})
 
-
     elif not item_triggering_sync.has_variants:
         if not item_triggering_sync.custom_send_to_shopify:
-            print(f"Skipping sync for simple item '{item_triggering_sync.name}': custom_send_to_shopify is not checked.")
             return
 
         product_payload = {
@@ -465,13 +465,20 @@ def send_item_to_shopify(doc, method):
 
         product_payload["product"]["variants"].append(variant_data)
 
-        if image_url: 
+        if image_url:
             product_payload["product"]["images"].append({"src": image_url})
-
 
     if parent_doc_for_payload.has_variants and not product_payload["product"]["variants"]:
         return
 
+    hsn_code = parent_doc_for_payload.gst_hsn_code or ""    
+    product_payload["product"]["metafields"] = [
+        {
+            "namespace": "custom",
+            "key": "hsn",
+            "value": int(hsn_code),
+        }
+    ]
 
     if product_shopify_id_to_update:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"
@@ -479,6 +486,7 @@ def send_item_to_shopify(doc, method):
     else:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
+        
 
     if response.status_code in [200, 201]:
         shopify_product = response.json()["product"]
@@ -509,86 +517,14 @@ def send_item_to_shopify(doc, method):
                         frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku} (Frappe item: {frappe_variant_item_name}): {str(e)}", "Shopify Sync")
         doc.flags.from_shopify = True
         frappe.db.commit()
-
     else:
         frappe.log_error(f"Failed to sync product {parent_doc_for_payload.name} to Shopify: Status {response.status_code} - {response.text}", "Shopify Sync Error")
 
 
 
 
-
-
-
-
-
-
-
-
-
-def update_shopify_hsn_code(hsn_code, inventory_item_id):
-    """Send harmonized system code (HSN) to Shopify for the given inventory item ID"""
-
-    if not hsn_code or not inventory_item_id:
-        return
-
-    shopify_keys = frappe.get_single("Shopify Connector Setting")
-    access_token = shopify_keys.access_token
-    store_url = shopify_keys.shop_url
-    api_version = "2024-01"
-
-    url = f"https://{store_url}/admin/api/{api_version}/inventory_items/{inventory_item_id}.json"
-
-    headers = {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": access_token
-    }
-
-    payload = {
-        "inventory_item": {
-            "id": int(inventory_item_id),
-            "harmonized_system_code": hsn_code,
-            "country_code_of_origin": "IN"
-        }
-    }
-
-    response = requests.put(url, json=payload, headers=headers)
-
-    if response.status_code != 200:
-        frappe.log_error(f"HSN update failed: {response.text}", "Shopify HSN Sync Error")
-       
 ###################################################################################################
 
-
-import pycountry
-import unicodedata
-
-def clean_name(name):
-    return unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('utf-8').lower().strip()
-
-def get_country_code(country_name):
-    name_clean = clean_name(country_name)
-    
-    for country in pycountry.countries:
-        if clean_name(country.name) == name_clean:
-            return country.alpha_2
-    return None
-
-
-def get_country_and_state_codes(country_name, state_name):
-    country_code = get_country_code(country_name)
-    if not country_code:
-        return None, None
-
-    state_clean = clean_name(state_name)
-
-    for subdiv in pycountry.subdivisions.get(country_code=country_code):
-        if state_clean in clean_name(subdiv.name):
-            state_code = subdiv.code.split('-')[-1]  
-            return country_code, state_code
-    else:
-        return frappe.throw(f"{state_name} not found in {country_name}")
-
-    # return country_code, None 
 
 
 def shopify_credentials():
@@ -731,3 +667,35 @@ def create_shopify_draft_order(doc, method):
         frappe.msgprint("Shopify draft order created successfully.")
     else:
         frappe.log_error(" Shopify Draft Order missing ID", response.text)
+        
+        
+        
+        
+# import pycountry
+# import unicodedata
+
+# def clean_name(name):
+#     return unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('utf-8').lower().strip()
+
+# def get_country_code(country_name):
+#     name_clean = clean_name(country_name)
+    
+#     for country in pycountry.countries:
+#         if clean_name(country.name) == name_clean:
+#             return country.alpha_2
+#     return None
+
+
+# def get_country_and_state_codes(country_name, state_name):
+#     country_code = get_country_code(country_name)
+#     if not country_code:
+#         return None, None
+
+#     state_clean = clean_name(state_name)
+
+#     for subdiv in pycountry.subdivisions.get(country_code=country_code):
+#         if state_clean in clean_name(subdiv.name):
+#             state_code = subdiv.code.split('-')[-1]  
+#             return country_code, state_code
+#     else:
+#         return frappe.throw(f"{state_name} not found in {country_name}")

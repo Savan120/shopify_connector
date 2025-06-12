@@ -708,7 +708,6 @@ def product_update():
         frappe.log_error("Please Enter the HSN Code in shopify")
         return
 
-    print("\n\n\n\n\n",item_hsn_code)
     item_doc_name = frappe.db.exists("Item", {"shopify_id": product_id})
     if not item_doc_name:
         frappe.log_error(f"Product with Shopify ID {product_id} does not exist in ERPNext. Creating new item.")
