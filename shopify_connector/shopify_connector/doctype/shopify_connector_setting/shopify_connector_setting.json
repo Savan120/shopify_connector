@@ -8,14 +8,14 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "shopify_section",
   "enable_shopify",
+  "shop_url",
   "api_key",
   "api_secret",
   "access_token",
-  "shop_url",
   "shopify_api_version",
   "uom",
-  "sales_order_series",
   "column_break_suda",
   "company",
   "delivery_after_days",
@@ -27,10 +27,9 @@
   "erpnext_to_shopify_section",
   "sync_customer",
   "sync_product",
-  "sync_location",
   "column_break_tqvw",
   "sync_orders",
-  "sync_invoices",
+  "sales_order_series",
   "section_break_ctwr",
   "item_group",
   "customer_group",
@@ -60,6 +59,7 @@
    "mandatory_depends_on": "eval:doc.enable_shopify"
   },
   {
+   "description": "Your Shopify store\u2019s URL in the format yourstore.myshopify.com.",
    "fieldname": "shop_url",
    "fieldtype": "Data",
    "label": "Shop URL",
@@ -67,6 +67,7 @@
   },
   {
    "default": "0",
+   "description": "Turns on the connector to import master data from Shopify.",
    "fieldname": "enable_shopify",
    "fieldtype": "Check",
    "label": "Enable Shopify"
@@ -127,16 +128,18 @@
   {
    "fieldname": "erpnext_to_shopify_section",
    "fieldtype": "Section Break",
-   "label": "ERPNext To Shopify"
+   "label": "ERPNext \u21c6 Shopify Data Sync"
   },
   {
    "default": "0",
+   "description": "Sync customer data from ERPNext to Shopify and Shopify to ERPNext.",
    "fieldname": "sync_customer",
    "fieldtype": "Check",
    "label": "Sync Customer"
   },
   {
    "default": "0",
+   "description": "Sync product/item data from ERPNext to Shopify and Shopify to ERPNext.",
    "fieldname": "sync_product",
    "fieldtype": "Check",
    "label": "Sync Product"
@@ -147,26 +150,16 @@
   },
   {
    "default": "0",
+   "description": "Sync orders from ERPNext to Shopify and ERPNext to Shopify.",
    "fieldname": "sync_orders",
    "fieldtype": "Check",
    "label": "Sync Orders"
   },
   {
-   "default": "0",
-   "fieldname": "sync_invoices",
-   "fieldtype": "Check",
-   "label": "Sync Invoices"
-  },
-  {
+   "description": "The version of the Shopify API you are using (e.g., 2025-04).",
    "fieldname": "shopify_api_version",
    "fieldtype": "Data",
    "label": "Shopify API Version"
-  },
-  {
-   "default": "0",
-   "fieldname": "sync_location",
-   "fieldtype": "Check",
-   "label": "Sync Location"
   },
   {
    "fieldname": "shopify_webhook_secret",
@@ -174,14 +167,17 @@
    "label": "Shopify Webhook Secret Key"
   },
   {
+   "description": "ERPNext user who performs webhook-based actions.",
    "fieldname": "webhook_session_user",
    "fieldtype": "Link",
    "label": "Webhook Session User",
    "options": "User"
   },
   {
+   "description": "Used when values are not provided by Shopify during sync)",
    "fieldname": "section_break_ctwr",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Backup Values for Sync"
   },
   {
    "fieldname": "item_group",
@@ -207,24 +203,30 @@
   },
   {
    "fieldname": "section_break_bvok",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Mapped Locations"
   },
   {
    "fieldname": "warehouse_setting",
    "fieldtype": "Table",
-   "label": "Warehouse Setting",
+   "label": "\ud83d\udce6 Warehouse Mapping",
    "options": "Shopify Warehouse Table"
   },
   {
    "fieldname": "fetch_location",
    "fieldtype": "Button",
-   "label": "Fetch Location"
+   "label": "\ud83d\udccd Fetch Locations"
+  },
+  {
+   "fieldname": "shopify_section",
+   "fieldtype": "Section Break",
+   "label": "Shopify Configuration"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-05 14:58:08.068728",
+ "modified": "2025-06-11 23:27:29.560363",
  "modified_by": "Administrator",
  "module": "Shopify Connector",
  "name": "Shopify Connector Setting",
