@@ -15,6 +15,7 @@ import hashlib
 import base64
 
 
+
 @frappe.whitelist(allow_guest=True)
 def receive_shopify_order():
     raw_request_body = frappe.local.request.get_data()
@@ -456,6 +457,8 @@ def product_creation():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     shopify_webhook_secret = shopify_keys.shopify_webhook_secret
 
+    frappe.session.user = shopify_keys.webhook_session_user
+
     try:
         request_body = frappe.local.request.get_data()
     except Exception as e:
@@ -563,7 +566,7 @@ def product_creation():
 
         item.flags.ignore_permissions = True
         item.flags.from_shopify = True
-        item.insert(ignore_mandatory=True)
+        # item.insert(ignore_mandatory=True)
         item.custom_ignore_product_update = True
         item.save()
 
@@ -599,6 +602,7 @@ def product_creation():
                     if matched_attr:
                         variant.append("attributes", {"attribute": matched_attr, "attribute_value": opt_value})
 
+                variant.save()
                 variant_image_id = v.get("image_id")
                 if variant_image_id:
                     variant_image_url = image_map.get(variant_image_id)
@@ -616,12 +620,8 @@ def product_creation():
 
                 variant.flags.ignore_permissions = True
                 variant.flags.from_shopify = True
-                variant.insert(ignore_mandatory=True)
+                # variant.insert(ignore_mandatory=True)
                 variant.custom_ignore_product_update = True
-                variant.save()
-
-        item.custom_ignore_product_update = True
-        print("Item Creation",item.custom_ignore_product_update)
         
         return "Product created with variants and HSN."
     else:
@@ -655,15 +655,7 @@ def product_update():
     options = product_data.get("options", [])
     item_group = product_data.get("product_type") or settings.item_group
     hsn_code_parent = get_hsn_from_metafields(product_data, settings)
-
-    if not frappe.db.exists("GST HSN Code", hsn_code_parent):
-        hs = frappe.new_doc("GST HSN Code")
-        hs.hsn_code = str(hsn_code_parent)
-        hs.flags.ignore_permissions = True
-        hs.insert(ignore_permissions=True)
-        hs.save()
-        hsn_code_parent = hs.name
-
+    
     if not frappe.db.exists("Item Group", {"name": item_group}):
         item_group_doc = frappe.new_doc("Item Group")
         item_group_doc.item_group_name = item_group
@@ -691,11 +683,13 @@ def product_update():
         item.custom_ignore_product_update = True
         item.disabled = product_data.get("status") == "draft"
         item.flags.ignore_permissions = True
+        item.flags.from_shopify = True
         item.insert(ignore_permissions=True)
-        item.save()
+        # item.save()
         update_item = False
     else:
         item = frappe.get_doc("Item", item_doc_name)
+        item.flags.from_shopify = True
         update_item = True
 
     if images:
@@ -714,21 +708,21 @@ def product_update():
                 file_doc.insert(ignore_permissions=True)
             else:
                 item.image = img_link
-    else:
-        if item.image:
-            file_doc_name = frappe.db.exists("File", {
-                "file_url": item.image,
-                "attached_to_doctype": "Item",
-                "attached_to_name": item.name
-            })
-            if file_doc_name:
-                frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
-            item.image = None
-            item.custom_ignore_product_update = True
-            item.update({
-                "custom_ignore_product_update": True
-            })
-            item.save()
+    # else:
+    #     if item.image:
+    #         file_doc_name = frappe.db.exists("File", {
+    #             "file_url": item.image,
+    #             "attached_to_doctype": "Item",
+    #             "attached_to_name": item.name
+    #         })
+    #         if file_doc_name:
+    #             frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
+    #         item.image = None
+    #         item.custom_ignore_product_update = True
+    #         item.update({
+    #             "custom_ignore_product_update": True
+    #         })
+    #         item.save()
 
     item.item_code = product_data.get("title")
     item.item_name = product_data.get("title")
@@ -763,7 +757,7 @@ def product_update():
                 attr_doc = frappe.new_doc("Item Attribute")
                 attr_doc.attribute_name = attr_name
                 attr_doc.flags.ignore_permissions = True
-                attr_doc.insert()
+                # attr_doc.insert()
             else:
                 attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
 
@@ -778,11 +772,11 @@ def product_update():
             item.append("attributes", {"attribute": attr_name})
             item.custom_ignore_product_update = True
             print("||||||||||||||||||||||||||||||||||||||",item.custom_ignore_product_update)
-            item.update({
-                "custom_ignore_product_update": True
-            })
-            frappe.db.commit()
-            # item.save()
+            # item.update({
+            #     "custom_ignore_product_update": True
+            # })
+            # frappe.db.commit()
+            item.save()
 
         shopify_images_map = {img.get("id"): img.get("src") for img in images}
 
@@ -808,7 +802,7 @@ def product_update():
             if not variant:
                 continue
             print("item.custom_ignore_product_update", item.custom_ignore_product_update)
-            variant.item_code = v.get("sku")
+            variant.item_code = v.get('title')
             variant.item_name = f"{product_data.get('title')}-{v.get('title')}"
             variant.item_group = item_group
             variant.variant_of = item.name
@@ -829,11 +823,11 @@ def product_update():
             
             variant.flags.ignore_permissions = True
             print("!!!!!!!!!!!!!!!!!!!",variant.custom_ignore_product_update)
-            # variant.save()
-            variant.update({
-                "custom_ignore_product_update": True
-            })
-            frappe.db.commit()
+            variant.save()
+            # variant.update({
+            #     "custom_ignore_product_update": True
+            # })
+            # frappe.db.commit()
             
 
             variant_image_id = v.get("image_id")
@@ -848,11 +842,11 @@ def product_update():
                     if file_doc_name:
                         frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
                     variant.image = None
-                    # variant.save()
-                    variant.update({
-                        "custom_ignore_product_update": True
-                    })
-                    frappe.db.commit()
+                    variant.save()
+                    # variant.update({
+                    #     "custom_ignore_product_update": True
+                    # })
+                    # frappe.db.commit()
             else:
                 if variant_image_url:
                     file_doc_name = frappe.db.exists("File", {"file_url": variant_image_url})
@@ -870,17 +864,17 @@ def product_update():
                     else:
                         variant.image = variant_image_url
                     print("@@@@@@@@@@@@@@@@@@@@@@@",variant.custom_send_to_shopify)
-                    # variant.save()
-                    variant.update({
-                        "custom_ignore_product_update": True
-                    })
-                    frappe.db.commit()
+                    variant.save()
+                    # variant.update({
+                    #     "custom_ignore_product_update": True
+                    # })
+                    # frasppe.db.commit()
 
-    if update_item:
-        item.flags.ignore_permissions = True
-        item.custom_ignore_product_update = True
-        item.flags.from_shopify = True
-        item.save()
+    # if update_item:
+    #     item.flags.ignore_permissions = True
+    #     item.custom_ignore_product_update = True
+    #     item.flags.from_shopify = True
+    #     item.save()
         
     # item.custom_ignore_product_update = True
     print("Item Update",item.custom_ignore_product_update)

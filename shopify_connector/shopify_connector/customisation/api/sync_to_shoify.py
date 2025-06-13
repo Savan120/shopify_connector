@@ -19,7 +19,7 @@ def send_customer_to_shopify_hook(doc, method):
     if doc.get("custom_ignore_address_update"):
         doc.custom_ignore_address_update = False
         return
-
+    
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_customer:
         return
@@ -298,16 +298,14 @@ def get_current_domain_name() -> str:
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_item_to_shopify(doc, method):
-    print("\n\n\n\n",method)
+    if getattr(doc.flags, "from_shopify", False):
+        return
     
-    print(doc.custom_ignore_product_update, "---------------------------------")
+    if doc.flags.from_shopify:
+        return
+    print(doc.custom_ignore_product_update, "---------------------------------", doc.name)
     if doc.custom_ignore_product_update:
-        # frappe.db.set_value(doc.doctype, doc.name, "custom_ignore_product_update", False, update_modified=False)
-        # doc.custom_ignore_product_update = False
-        doc.update({
-            "custom_ignore_product_update": False
-        })
-        frappe.db.commit()
+        frappe.db.set_value(doc.doctype, doc.name, "custom_ignore_product_update", False, update_modified=False)
         return
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
