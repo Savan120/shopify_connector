@@ -90,9 +90,10 @@ frappe.pages['shopify-customer'].on_page_load = function(wrapper) {
                 <tbody>`;
 
         syncedCustomers[0].forEach(function(customer) {
+            console.log(customer.shopify_customer)
             tableHtml += `
                 <tr>
-                    <td>${customer.shopify_id || 'N/A'}</td> <td><a href="/app/customer/${customer.shopify_customer || 'N/A'}"></td> <td>${customer.shopify_email || 'N/A'}</td>
+                    <td>${customer.shopify_id || 'N/A'}</td> <td><a href="/app/customer/${(customer.shopify_customer || '')}">${(customer.shopify_customer || '')}</td> <td>${customer.shopify_email || 'N/A'}</td>
                 </tr>`;
         });
 

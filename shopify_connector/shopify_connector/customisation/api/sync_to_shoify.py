@@ -10,6 +10,8 @@ def enqueue_send_customer_to_shopify(doc, method):
 def send_customer_to_shopify_hook_delayed(doc,method):
     send_customer_to_shopify_hook(doc, "after_insert")
     
+    
+#! send_customer_to_shopify_hook>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.
 def send_customer_to_shopify_hook(doc, method):
     if doc.flags.from_shopify:
         return
@@ -153,7 +155,7 @@ def send_customer_to_shopify_hook(doc, method):
     except Exception as e:
         frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
 
-
+#!>>>>>>>>>>>>>>>>>>on_address_update>>>>>>>>>>>>>>>>>>>>
 def on_address_update(doc, method):    
     address_payload = {
         "address": {
@@ -215,6 +217,9 @@ def on_address_update(doc, method):
     updated_data = response.json()
     frappe.msgprint(f"Shopify address updated successfully: {updated_data['customer_address']['id']}")
     
+    
+    
+#!>>>>>>>>>>>>>>>>>>>>>>>>>>send_contact_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_contact_to_shopify(doc, method):
     data = {
         "customer": {
@@ -248,6 +253,8 @@ def send_contact_to_shopify(doc, method):
         frappe.log_error(f"Shopify customer sync failed: {response.text}", "Shopify Sync Error")
 
 
+
+#!>>>>>>>>>>>>>>>>>>>>>>>>delete_customer_from_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def delete_customer_from_shopify(doc, method):
     if not doc.shopify_id:
         return
@@ -265,8 +272,8 @@ def delete_customer_from_shopify(doc, method):
         frappe.log_error(f"Failed to delete customer from Shopify: {response.text}", "Shopify Customer Delete Error")
 
 
-
-
+#!>>>>>>>>>>>>>>>>>>>>>>>>>get_current_domain_name>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    
 def get_current_domain_name() -> str:
     if hasattr(frappe.local, 'request') and frappe.local.request:
         return frappe.local.request.host
@@ -278,20 +285,37 @@ def get_current_domain_name() -> str:
         else:
             return "localhost"
 
+
+
+#!>>>>>>>>>>>>>>>>>>>>>>.check_boolean_for_update>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# def check_boolean_for_update(doc, method):
+    
+    
+#     else:
+#         doc.custom_ignore_product_update = False
+#         send_item_to_shopify(doc, method)
+        
+
+#!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_item_to_shopify(doc, method):
-    if doc.flags.from_shopify:
-        return
+    print("\n\n\n\n",method)
     
+    print(doc.custom_ignore_product_update, "---------------------------------")
     if doc.custom_ignore_product_update:
-        doc.db_set("custom_ignore_product_update", 0)
+        # frappe.db.set_value(doc.doctype, doc.name, "custom_ignore_product_update", False, update_modified=False)
+        # doc.custom_ignore_product_update = False
+        doc.update({
+            "custom_ignore_product_update": False
+        })
+        frappe.db.commit()
         return
-    
+
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_product:
         return
-    
+
     item_triggering_sync = frappe.get_doc("Item", doc.name)
-    
+
     frappe_template_item_name = None
     parent_doc_for_payload = None
 
@@ -304,11 +328,7 @@ def send_item_to_shopify(doc, method):
     else:
         parent_doc_for_payload = item_triggering_sync
 
-    if not parent_doc_for_payload:
-        frappe.log_error(f"No parent or template item found to sync for {doc.name}", "Shopify Sync Error")
-        return
-
-    if not parent_doc_for_payload.custom_send_to_shopify:
+    if not parent_doc_for_payload or not parent_doc_for_payload.custom_send_to_shopify:
         return
 
     site_url = get_current_domain_name()
@@ -324,6 +344,12 @@ def send_item_to_shopify(doc, method):
         if not site_url.startswith("http"):
             site_url = "https://" + site_url
         image_url = site_url + parent_doc_for_payload.image
+    elif parent_doc_for_payload.has_variants or parent_doc_for_payload.name != item_triggering_sync.name:
+        variants = frappe.get_all("Item", filters={"variant_of": parent_doc_for_payload.name}, fields=["image"])
+        for variant in variants:
+            if variant.image:
+                image_url = site_url + variant.image if not variant.image.startswith("http") else variant.image
+                break
 
     product_payload = {
         "product": {
@@ -383,7 +409,6 @@ def send_item_to_shopify(doc, method):
                 continue
 
             variant_doc = frappe.get_doc("Item", variant_frappe["name"])
-
             attributes = frappe.get_all(
                 "Item Variant Attribute",
                 filters={"parent": variant_doc.name},
@@ -397,6 +422,7 @@ def send_item_to_shopify(doc, method):
 
             values = [attr_dict.get(attr) for attr in attribute_order]
             values += [None] * (3 - len(values))
+
             variant_data = {
                 "option1": values[0],
                 "option2": values[1],
@@ -471,7 +497,7 @@ def send_item_to_shopify(doc, method):
     if parent_doc_for_payload.has_variants and not product_payload["product"]["variants"]:
         return
 
-    hsn_code = parent_doc_for_payload.gst_hsn_code or ""    
+    hsn_code = parent_doc_for_payload.gst_hsn_code or ""
     product_payload["product"]["metafields"] = [
         {
             "namespace": "custom",
@@ -486,7 +512,6 @@ def send_item_to_shopify(doc, method):
     else:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
-        
 
     if response.status_code in [200, 201]:
         shopify_product = response.json()["product"]
@@ -518,8 +543,8 @@ def send_item_to_shopify(doc, method):
         doc.flags.from_shopify = True
         frappe.db.commit()
     else:
-        frappe.log_error(f"Failed to sync product {parent_doc_for_payload.name} to Shopify: Status {response.status_code} - {response.text}", "Shopify Sync Error")
-
+        frappe.log_error(title=f"Failed to sync product {parent_doc_for_payload.name} to Shopify", message= f"Status {response.status_code} - {response.text}")
+        return
 
 
 
