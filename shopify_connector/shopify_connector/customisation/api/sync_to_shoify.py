@@ -3,6 +3,15 @@ import requests
 
 from frappe.utils.background_jobs import enqueue
 
+
+def validate_api_path():
+    url = frappe.request.url
+    path = url.split("//")[1].split("/")[-1] if "//" in url else url.split("/", 1)[-1]
+    endpoint_key = path.split("/")[0] if path else ""
+    if endpoint_key != "frappe.desk.form.save.savedocs":
+        return False
+    return True
+
 def enqueue_send_customer_to_shopify(doc, method):
     if not getattr(doc.flags, "from_shopify", False):
         enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
@@ -156,7 +165,9 @@ def send_customer_to_shopify_hook(doc, method):
         frappe.log_error(f"Exception during Shopify customer sync: {str(e)}", "Shopify Sync Error")
 
 #!>>>>>>>>>>>>>>>>>>on_address_update>>>>>>>>>>>>>>>>>>>>
-def on_address_update(doc, method):    
+
+
+def on_address_update(doc, method):
     address_payload = {
         "address": {
             "first_name": doc.address_title,
@@ -166,14 +177,13 @@ def on_address_update(doc, method):
             "province": doc.state or doc.custom_state or "",
             "country": doc.country,
             "zip": doc.pincode,
-            "phone": doc.phone
+            "phone": doc.phone or ""
         }
     }
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_customer:
         return
-    
 
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
@@ -183,7 +193,7 @@ def on_address_update(doc, method):
         "Content-Type": "application/json",
         "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN
     }
-    
+
     shopify_customer_id = frappe.db.get_value("Customer", {"customer_primary_address": doc.name}, "shopify_id")
     if not shopify_customer_id:
         for row in doc.links:
@@ -195,28 +205,63 @@ def on_address_update(doc, method):
     if not shopify_customer_id:
         frappe.log_error("Shopify customer ID not found for address update.", "Shopify Sync Error")
         return
-    
+
     shopify_address_id = frappe.db.get_value("Address", doc.name, "shopify_id")
+    print(shopify_address_id,"??????????????????")
+
     if not shopify_address_id:
-        url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses.json"
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        addresses = response.json().get("addresses", [])
-        shopify_address_id = addresses[0]["id"] if addresses else None
-        frappe.db.set_value("Address", doc.name, "shopify_id", shopify_address_id)
-    
-    else :
-        frappe.log_error(f"Shopify address ID not found for address '{doc.name}'. Cannot update.", "Shopify Sync Error")
-        return
+        url_get_addresses = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses.json"
+        try:
+            response_get = requests.get(url_get_addresses, headers=headers)
 
-    url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses/{shopify_address_id}.json"
-    
-    response = requests.put(url, headers=headers, json=address_payload)
-    response.raise_for_status()
+            print(response_get.json(),">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.")
+            response_get.raise_for_status()
+            addresses_on_shopify = response_get.json().get("addresses", [])
 
-    updated_data = response.json()
-    frappe.msgprint(f"Shopify address updated successfully: {updated_data['customer_address']['id']}")
-    
+            found_address_id = None
+            for shopify_addr in addresses_on_shopify:
+                if (shopify_addr.get("address1") == doc.address_line1 and
+                    shopify_addr.get("city") == doc.city and
+                    shopify_addr.get("zip") == doc.pincode):
+                    found_address_id = shopify_addr.get("id")
+                    break
+            
+
+            print(">>>>>>>>>>>>>",found_address_id)
+            if found_address_id:
+                shopify_address_id = found_address_id
+                frappe.db.set_value("Address", doc.name, "shopify_id", shopify_address_id)
+            else:
+                frappe.log_error(f"Matching Shopify address not found for local address '{doc.name}'. Cannot update.", "Shopify Sync Error")
+                frappe.msgprint(f"Error: Matching Shopify address not found for '{doc.name}'. Cannot sync.")
+                return
+        except requests.exceptions.RequestException as e:
+            frappe.log_error(f"Error fetching Shopify addresses for customer {shopify_customer_id}: {e}", "Shopify Sync Error")
+            frappe.msgprint(f"Error connecting to Shopify to find address: {e}")
+            return
+    else:
+        pass
+
+
+    if shopify_address_id:
+        url_update_address = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers/{shopify_customer_id}/addresses/{shopify_address_id}.json"
+
+        try:
+            response = requests.put(url_update_address, headers=headers, json=address_payload)
+            response.raise_for_status() 
+
+            updated_data = response.json()
+            frappe.msgprint(f"Shopify address updated successfully: {updated_data['customer_address']['id']}")
+        except requests.exceptions.HTTPError as e:
+            error_message = e.response.json()
+            frappe.log_error(f"Shopify address update failed for address '{doc.name}' (Shopify ID: {shopify_address_id}): {error_message}", "Shopify Sync Error")
+            frappe.msgprint(f"Error updating Shopify address for {doc.name}: {error_message}")
+        except requests.exceptions.RequestException as e:
+            frappe.log_error(f"Network or connection error updating Shopify address for '{doc.name}': {e}", "Shopify Sync Error")
+            frappe.msgprint(f"Network error updating Shopify address for {doc.name}: {e}")
+    else:
+        frappe.log_error(f"Shopify address ID is missing after all attempts for address '{doc.name}'. Update aborted.", "Shopify Sync Error")
+        frappe.msgprint(f"Error: Could not determine Shopify address ID for '{doc.name}'. Update failed.")
     
     
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>send_contact_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -255,6 +300,7 @@ def send_contact_to_shopify(doc, method):
 
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>delete_customer_from_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 def delete_customer_from_shopify(doc, method):
     if not doc.shopify_id:
         return
@@ -286,26 +332,10 @@ def get_current_domain_name() -> str:
             return "localhost"
 
 
-
-#!>>>>>>>>>>>>>>>>>>>>>>.check_boolean_for_update>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# def check_boolean_for_update(doc, method):
-    
-    
-#     else:
-#         doc.custom_ignore_product_update = False
-#         send_item_to_shopify(doc, method)
-        
-
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_item_to_shopify(doc, method):
-    if getattr(doc.flags, "from_shopify", False):
-        return
-    
-    if doc.flags.from_shopify:
-        return
-    print(doc.custom_ignore_product_update, "---------------------------------", doc.name)
-    if doc.custom_ignore_product_update:
-        frappe.db.set_value(doc.doctype, doc.name, "custom_ignore_product_update", False, update_modified=False)
+    from_desk = validate_api_path()
+    if not from_desk:
         return
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
