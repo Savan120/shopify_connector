@@ -706,17 +706,17 @@ def product_update():
                 file_doc.insert(ignore_permissions=True)
             else:
                 item.image = img_link
-    # else:
-    #     if item.image:
-    #         file_doc_name = frappe.db.exists("File", {
-    #             "file_url": item.image,
-    #             "attached_to_doctype": "Item",
-    #             "attached_to_name": item.name
-    #         })
-    #         if file_doc_name:
-    #             frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
-    #         item.image = None
-    #         item.save()
+    else:
+        if item.image:
+            file_doc_name = frappe.db.exists("File", {
+                "file_url": item.image,
+                "attached_to_doctype": "Item",
+                "attached_to_name": item.name
+            })
+            if file_doc_name:
+                frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
+            item.image = None
+            item.save()
 
     item.item_code = product_data.get("title")
     item.item_name = product_data.get("title")
@@ -742,28 +742,64 @@ def product_update():
                 pass
     
     else:
+        # item.has_variants = 1
+        # item.set("attributes", [])
+        # for opt in options:
+        #     attr_name = opt["name"]
+        #     if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
+        #         attr_doc = frappe.new_doc("Item Attribute")
+        #         attr_doc.attribute_name = attr_name
+        #         attr_doc.flags.ignore_permissions = True
+        #         # attr_doc.insert()
+        #     else:
+        #         attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
+
+        #     existing_vals = frappe.get_all("Item Attribute Value", filters={"parent": attr_name}, pluck="attribute_value")
+        #     for val in opt["values"]:
+        #         if val not in existing_vals:
+        #             attr_doc.append("item_attribute_values", {"attribute_value": val, "abbr": val})
+
+        #     attr_doc.flags.ignore_permissions = True
+        #     attr_doc.save()
+        #     item.append("attributes", {"attribute": attr_name})
+        #     # frappe.db.commit()
+        #     item.save()
         item.has_variants = 1
-        item.set("attributes", [])
+
+        new_attr_names = [opt["name"] for opt in options]
+
+        existing_attr_names = [attr.attribute for attr in item.attributes]
+
         for opt in options:
             attr_name = opt["name"]
+
             if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
                 attr_doc = frappe.new_doc("Item Attribute")
                 attr_doc.attribute_name = attr_name
                 attr_doc.flags.ignore_permissions = True
-                # attr_doc.insert()
             else:
                 attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
 
-            existing_vals = frappe.get_all("Item Attribute Value", filters={"parent": attr_name}, pluck="attribute_value")
+            existing_vals = frappe.get_all("Item Attribute Value", filters={"parent": attr_doc.name}, pluck="attribute_value")
             for val in opt["values"]:
                 if val not in existing_vals:
                     attr_doc.append("item_attribute_values", {"attribute_value": val, "abbr": val})
 
             attr_doc.flags.ignore_permissions = True
             attr_doc.save()
-            item.append("attributes", {"attribute": attr_name})
-            # frappe.db.commit()
-            item.save()
+
+            if attr_name not in existing_attr_names:
+                item.append("attributes", {"attribute": attr_name})
+
+        for existing_attr in existing_attr_names:
+            if existing_attr not in new_attr_names:
+                variants = frappe.get_all("Item", filters={"variant_of": item.name}, pluck="name")
+                if variants:
+                    frappe.msgprint(f"Attribute '{existing_attr}' exists in variants and can't be removed from the template.")
+                else:
+                    item.attributes = [attr for attr in item.attributes if attr.attribute != existing_attr]
+        item.flags.ignore_permissions = True
+        item.save()
 
         shopify_images_map = {img.get("id"): img.get("src") for img in images}
 
