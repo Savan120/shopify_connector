@@ -685,11 +685,8 @@ def product_update():
         item.disabled = product_data.get("status") == "draft"
         item.flags.ignore_permissions = True
         item.insert(ignore_permissions=True)
-        # item.save()
-        update_item = False
     else:
         item = frappe.get_doc("Item", item_doc_name)
-        update_item = True
 
     if images:
         img_link = images[0].get("src")
