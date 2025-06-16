@@ -300,6 +300,7 @@ def customer_creation():
     frappe.log_error(title="Customer Creation", message="Called")
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     shopify_webhook_secret = shopify_keys.shopify_webhook_secret
+    frappe.session.user = shopify_keys.webhook_session_user
 
     try:
         request_body = frappe.local.request.get_data()
@@ -886,7 +887,7 @@ def product_update():
     #     item.save()
         
 
-
+    frappe.log_error(title="Product Update", message="Completed")
     return "Product updated successfully."
 
 
@@ -909,11 +910,16 @@ def get_hsn_from_metafields(product_data, settings):
             if metafield.get('namespace') == 'custom' and metafield.get('key') == 'hsn':
                 hsn_code = metafield.get('value')
                 if hsn_code:
+                    try:
+                        hsn_code = json.loads(hsn_code)[0]
+                    except (json.JSONDecodeError, IndexError, TypeError):
+                        frappe.throw("Invalid HSN code format from metafield")
                     if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code}):
                         hs = frappe.new_doc("GST HSN Code")
                         hs.hsn_code = str(hsn_code)
                         hs.insert(ignore_permissions=True)
                         hsn_code = hs.name
+
                     return hsn_code
     else:
         frappe.log_error("Error:", response.status_code, response.text)

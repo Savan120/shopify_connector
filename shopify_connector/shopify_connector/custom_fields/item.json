@@ -2,10 +2,9 @@
  "Item": [
   {
    "dt": "Item",
-   "fieldname": "custom_ignore_product_update",
-   "fieldtype": "Check",
-   "insert_after": "custom_variant_id",
-   "label": "Ignore Product Update",
+   "fieldname": "custom_shopify_ids",
+   "fieldtype": "Tab Break",
+   "label": "Shopify ID's",
    "module": "Shopify Connector"
   },
   {
