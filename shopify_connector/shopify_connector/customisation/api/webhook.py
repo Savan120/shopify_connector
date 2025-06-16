@@ -1127,144 +1127,144 @@ def get_hsn_from_metafields(product_data, settings):
     return None
 
 
-@frappe.whitelist(allow_guest=True)
-def get_inventory_level():
+# @frappe.whitelist(allow_guest=True)
+# def get_inventory_level():
 
-    raw_request_body = frappe.local.request.get_data()
-    shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
-    try:
-        settings_doc = frappe.get_single("Shopify Connector Setting")
-        shopify_webhook_secret = settings_doc.shopify_webhook_secret
+#     raw_request_body = frappe.local.request.get_data()
+#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+#     try:
+#         settings_doc = frappe.get_single("Shopify Connector Setting")
+#         shopify_webhook_secret = settings_doc.shopify_webhook_secret
 
-        if not shopify_webhook_secret:
-            frappe.throw(_("Webhook secret not configured in Shopify Connector Setting."), frappe.ValidationError)
+#         if not shopify_webhook_secret:
+#             frappe.throw(_("Webhook secret not configured in Shopify Connector Setting."), frappe.ValidationError)
 
-        secret_key_bytes = shopify_webhook_secret.encode("utf-8")
-        calculated_hmac = base64.b64encode(
-            hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
-        )
+#         secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+#         calculated_hmac = base64.b64encode(
+#             hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
+#         )
 
-        if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
-            frappe.log_error(title="Unauthorized: Invalid webhook signature.", message="Check Webhook Secret")
+#         if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
+#             frappe.log_error(title="Unauthorized: Invalid webhook signature.", message="Check Webhook Secret")
 
-    except Exception as e:
-        frappe.log_error(title="Check the Webhook Secret",message= f"Unexpected error during webhook verification: {e}")
+#     except Exception as e:
+#         frappe.log_error(title="Check the Webhook Secret",message= f"Unexpected error during webhook verification: {e}")
 
-    inv_level = json.loads(raw_request_body.decode("utf-8"))
-    print(inv_level)
-    inventory_item_id = inv_level.get("inventory_item_id")
-    location_id = inv_level.get("location_id")
-    available_qty = inv_level.get("available")
+#     inv_level = json.loads(raw_request_body.decode("utf-8"))
+#     print(inv_level)
+#     inventory_item_id = inv_level.get("inventory_item_id")
+#     location_id = inv_level.get("location_id")
+#     available_qty = inv_level.get("available")
 
-    if inventory_item_id and location_id is not None:
-        item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
+#     if inventory_item_id and location_id is not None:
+#         item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
 
-        settings_doc = frappe.get_single("Shopify Connector Setting")
-        erpnext_warehouse = None
+#         settings_doc = frappe.get_single("Shopify Connector Setting")
+#         erpnext_warehouse = None
 
-        for mapping in settings_doc.get("warehouse_setting"):
-            if str(mapping.shopify_id) == str(location_id):
-                erpnext_warehouse = mapping.erpnext_warehouse
-                break
+#         for mapping in settings_doc.get("warehouse_setting"):
+#             if str(mapping.shopify_id) == str(location_id):
+#                 erpnext_warehouse = mapping.erpnext_warehouse
+#                 break
 
-        if not item_code or not erpnext_warehouse:
-            frappe.log_error(
-                f"Missing mapping for item: {inventory_item_id} or location: {location_id}",
-                "Shopify Inventory Sync"
-            )
-            return
+#         if not item_code or not erpnext_warehouse:
+#             frappe.log_error(
+#                 f"Missing mapping for item: {inventory_item_id} or location: {location_id}",
+#                 "Shopify Inventory Sync"
+#             )
+#             return
 
-        bin_doc = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse}, "name")
+#         bin_doc = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse}, "name")
 
-        if bin_doc:
-            bin_doc = frappe.get_doc("Bin", bin_doc)
-            old_qty = bin_doc.actual_qty
-            bin_doc.actual_qty = available_qty
-            bin_doc.save(ignore_permissions=True)
+#         if bin_doc:
+#             bin_doc = frappe.get_doc("Bin", bin_doc)
+#             old_qty = bin_doc.actual_qty
+#             bin_doc.actual_qty = available_qty
+#             bin_doc.save(ignore_permissions=True)
 
-            frappe.log_error(
-                title=f"Bin level Updated for {item_code}",
-                message=f"{item_code} in {erpnext_warehouse} updated from {old_qty} to {available_qty}"
-            )
-        else:
-            try:
-                bin_doc = frappe.get_doc({
-                    "doctype": "Bin",
-                    "item_code": item_code,
-                    "warehouse": erpnext_warehouse,
-                    "actual_qty": available_qty,
-                })
-                bin_doc.insert(ignore_permissions=True)
+#             frappe.log_error(
+#                 title=f"Bin level Updated for {item_code}",
+#                 message=f"{item_code} in {erpnext_warehouse} updated from {old_qty} to {available_qty}"
+#             )
+#         else:
+#             try:
+#                 bin_doc = frappe.get_doc({
+#                     "doctype": "Bin",
+#                     "item_code": item_code,
+#                     "warehouse": erpnext_warehouse,
+#                     "actual_qty": available_qty,
+#                 })
+#                 bin_doc.insert(ignore_permissions=True)
 
-                frappe.log_error(
-                    title=f"Bin Created for {item_code}",
-                    message=f"New bin for {item_code} in {erpnext_warehouse} created with qty {available_qty}"
-                )
-            except Exception as e:
-                frappe.log_error(frappe.get_traceback(), "Error creating Bin for Shopify Inventory Sync")
-                frappe.throw(_(f"Error creating new bin: {e}"))
+#                 frappe.log_error(
+#                     title=f"Bin Created for {item_code}",
+#                     message=f"New bin for {item_code} in {erpnext_warehouse} created with qty {available_qty}"
+#                 )
+#             except Exception as e:
+#                 frappe.log_error(frappe.get_traceback(), "Error creating Bin for Shopify Inventory Sync")
+#                 frappe.throw(_(f"Error creating new bin: {e}"))
 
 
 
-@frappe.whitelist(allow_guest=True)
-def get_inventory_update():
-    raw_request_body = frappe.local.request.get_data()
-    shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+# @frappe.whitelist(allow_guest=True)
+# def get_inventory_update():
+#     raw_request_body = frappe.local.request.get_data()
+#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
 
-    try:
-        settings_doc = frappe.get_single("Shopify Connector Setting")
-        shopify_webhook_secret = settings_doc.shopify_webhook_secret
+#     try:
+#         settings_doc = frappe.get_single("Shopify Connector Setting")
+#         shopify_webhook_secret = settings_doc.shopify_webhook_secret
 
-        if not shopify_webhook_secret:
-            frappe.throw(
-                _("Webhook secret not configured. Please set it up in Shopify Connector Setting."),
-                frappe.ValidationError,
-            )
+#         if not shopify_webhook_secret:
+#             frappe.throw(
+#                 _("Webhook secret not configured. Please set it up in Shopify Connector Setting."),
+#                 frappe.ValidationError,
+#             )
 
-        calculated_hmac = base64.b64encode(
-            hmac.new(shopify_webhook_secret.encode(), raw_request_body, hashlib.sha256).digest()
-        )
+#         calculated_hmac = base64.b64encode(
+#             hmac.new(shopify_webhook_secret.encode(), raw_request_body, hashlib.sha256).digest()
+#         )
 
-        if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
-            frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
+#         if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
+#             frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
 
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Shopify Webhook Verification Error")
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Shopify Webhook Verification Error")
 
-    inv_data = json.loads(raw_request_body.decode("utf-8"))
-    print(inv_data,"\n\n\n\n")
-    inventory_item_id = inv_data.get("inventory_item_id")
-    location_id = inv_data.get("location_id")
-    available_qty = inv_data.get("available")
+#     inv_data = json.loads(raw_request_body.decode("utf-8"))
+#     print(inv_data,"\n\n\n\n")
+#     inventory_item_id = inv_data.get("inventory_item_id")
+#     location_id = inv_data.get("location_id")
+#     available_qty = inv_data.get("available")
 
-    if not (inventory_item_id and location_id and available_qty is not None):
-        frappe.throw(_("Missing required fields in webhook payload"))
+#     if not (inventory_item_id and location_id and available_qty is not None):
+#         frappe.throw(_("Missing required fields in webhook payload"))
 
-    item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
+#     item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
 
-    erpnext_warehouse = None
-    for mapping in settings_doc.get("warehouse_setting"):
-        if str(mapping.shopify_id) == str(location_id):
-            erpnext_warehouse = mapping.erpnext_warehouse
-            break
+#     erpnext_warehouse = None
+#     for mapping in settings_doc.get("warehouse_setting"):
+#         if str(mapping.shopify_id) == str(location_id):
+#             erpnext_warehouse = mapping.erpnext_warehouse
+#             break
 
-    if not item_code or not erpnext_warehouse:
-        frappe.log_error(f"Mapping not found for item: {inventory_item_id} or location: {location_id}","Shopify Inventory Update")
-        return
+#     if not item_code or not erpnext_warehouse:
+#         frappe.log_error(f"Mapping not found for item: {inventory_item_id} or location: {location_id}","Shopify Inventory Update")
+#         return
 
-    try:
-        bin_doc = frappe.get_doc("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse})
-        old_qty = bin_doc.actual_qty
-        bin_doc.actual_qty = available_qty
-        bin_doc.save(ignore_permissions=True)
-        frappe.log_error(f"[Shopify Inventory Update] {item_code} in {erpnext_warehouse} changed from {old_qty} → {available_qty}")
+#     try:
+#         bin_doc = frappe.get_doc("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse})
+#         old_qty = bin_doc.actual_qty
+#         bin_doc.actual_qty = available_qty
+#         bin_doc.save(ignore_permissions=True)
+#         frappe.log_error(f"[Shopify Inventory Update] {item_code} in {erpnext_warehouse} changed from {old_qty} → {available_qty}")
         
-    except frappe.DoesNotExistError:
-        frappe.log_error(f"Bin not found for Item: {item_code}, Warehouse: {erpnext_warehouse}","Shopify Inventory Update")
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "Error updating Bin for Shopify Inventory Update")
+#     except frappe.DoesNotExistError:
+#         frappe.log_error(f"Bin not found for Item: {item_code}, Warehouse: {erpnext_warehouse}","Shopify Inventory Update")
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Error updating Bin for Shopify Inventory Update")
 
-    return f"{item_code} updated to {available_qty} in {erpnext_warehouse}"
+#     return f"{item_code} updated to {available_qty} in {erpnext_warehouse}"
 
 
 
