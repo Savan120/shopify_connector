@@ -325,7 +325,6 @@ def send_item_to_shopify(doc, method):
     if not from_desk:
         return
     
-    frappe.log_error(titel="Checking the item update from ")
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_product:
@@ -520,7 +519,7 @@ def send_item_to_shopify(doc, method):
         {
             "namespace": "custom",
             "key": "hsn",
-            "value": [int(hsn_code)],
+            "value": str([int(hsn_code)]),
         }
     ]
 
