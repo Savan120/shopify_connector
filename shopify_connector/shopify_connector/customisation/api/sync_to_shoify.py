@@ -324,6 +324,8 @@ def send_item_to_shopify(doc, method):
     from_desk = validate_api_path()
     if not from_desk:
         return
+    
+    frappe.log_error(titel="Checking the item update from ")
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_product:
@@ -378,6 +380,7 @@ def send_item_to_shopify(doc, method):
             "options": [],
         }
     }
+    
 
     if image_url:
         product_payload["product"]["images"].append({"src": image_url})
@@ -517,9 +520,10 @@ def send_item_to_shopify(doc, method):
         {
             "namespace": "custom",
             "key": "hsn",
-            "value": int(hsn_code),
+            "value": [int(hsn_code)],
         }
     ]
+
 
     if product_shopify_id_to_update:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"

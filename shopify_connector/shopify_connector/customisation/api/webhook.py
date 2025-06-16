@@ -454,6 +454,224 @@ def customer_creation():
         return
     
 @frappe.whitelist(allow_guest=True)
+def customer_update():
+    raw_request_body = frappe.local.request.get_data()
+    shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+
+    settings = frappe.get_single("Shopify Connector Setting")
+    try:
+        shopify_webhook_secret = settings.shopify_webhook_secret
+
+        if not shopify_webhook_secret:
+            frappe.throw(
+                _("Webhook secret not configured. Please set it up in Shopify Connector Setting."),
+                frappe.ValidationError,
+            )
+
+        if not shopify_hmac_header:
+            frappe.throw(_("Unauthorized: Webhook signature missing."), frappe.PermissionError)
+
+        secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+        calculated_hmac = base64.b64encode(
+            hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
+        ).decode()
+
+        if not hmac.compare_digest(calculated_hmac, shopify_hmac_header):
+            frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
+
+    except Exception as e:
+        frappe.throw(_(f"Webhook verification error: {e}"))
+
+    order_data = frappe.parse_json(raw_request_body.decode("utf-8"))
+
+    user = frappe.session.user = settings.webhook_session_user 
+    if not user:
+        frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
+    
+    shopify_id = order_data.get("id")
+    
+    headers = {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': f'{settings.access_token}',
+        }
+
+    json_data = {
+        'query': 'query getCustomerTags($id: ID!) { customer(id: $id) { id tags } }',
+        'variables': {
+            'id': f'gid://shopify/Customer/{shopify_id}',
+        },
+    }
+
+    response = requests.post(f'https://{settings.shop_url}/admin/api/{settings.shopify_api_version}/graphql.json', headers=headers, json=json_data)
+    response_data = response.json()
+    tag = ""
+    tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
+    if tags:
+        tag = tags[0]
+        if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
+            customer_group = frappe.new_doc("Customer Group")
+            customer_group.customer_group_name = tag
+            customer_group.flags.ignore_permissions = True
+            customer_group.insert(ignore_permissions=True)
+    else:
+        tag = settings.customer_group
+        
+        
+    if not shopify_id:
+        frappe.throw(_("Shopify customer ID is missing in the payload."))
+
+    customer_name = ""
+    if order_data.get("first_name") or order_data.get("last_name"):
+        customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
+    if not order_data.get("last_name"):
+        customer_name = order_data.get("first_name")
+        
+    if frappe.db.exists("Customer", {"shopify_id": shopify_id}):
+        customer = frappe.get_doc("Customer", {"shopify_id": shopify_id})
+
+        if not customer:
+            frappe.msgprint(_("Customer not found with Shopify ID."))
+            return
+        customer.flags.ignore_permissions = True
+        customer.customer_name = customer_name
+        customer.shopify_email = order_data.get("email")
+        customer.customer_group = tag
+        customer.default_currency = order_data.get("currency")
+        customer.custom_ignore_address_update = True
+        customer.flags.from_shopify = True
+        customer.save()
+    else :
+        customer= frappe.new_doc("Customer")
+        customer.customer_name = customer_name
+        customer.shopify_id = order_data.get("id")
+        customer.shopify_email = order_data.get("email") or ""
+        customer.customer_group = tag
+        customer.default_currency= order_data.get("currency")
+        customer.custom_ignore_address_update = True
+        customer.flags.from_shopify = True
+        customer.flags.ignore_permissions = True
+        customer.insert(ignore_mandatory=True)
+        customer.save()
+        if frappe.db.exists("Territory", order_data.get("default_address", {}).get("province")):
+            customer.territory = order_data.get("default_address", {}).get("province")
+        else:
+            customer.territory = settings.territory 
+        customer.save()
+        
+    state = ""
+    pincode = ""
+    if order_data.get("default_address"):
+        state = order_data.get("default_address").get("province") 
+        pincode = order_data.get("default_address").get("zip")
+
+    address_data = order_data.get("default_address")
+    if state and pincode:
+
+        address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
+        if not address:
+            address = frappe.db.get_value("Dynamic Link", {"link_doctype": "Customer", "link_name": customer.name, "parenttype": "Address"}, "parent")
+        if address:
+            address = frappe.get_doc("Address", address)
+        else:
+            address = frappe.new_doc("Address")
+            address.address_title = address_data.get("first_name")
+            address.address_type = "Shipping"
+            address.shopify_id = address_data.get("id")
+            address.address_line1 = address_data.get("address1") or address_data.get("address2")
+            address.address_line2 = address_data.get("address2")
+            address.city = address_data.get("city")
+            address.state = address_data.get("province")
+            address.country = address_data.get("country")
+            address.pincode = address_data.get("zip")
+            address.phone = address_data.get("phone")
+            address.first_name = address_data.get("first_name")
+            address.last_name = address_data.get("last_name")
+            address.append("links", {
+                "link_doctype": "Customer",
+                "link_name": customer.name,
+            })
+            address.flags.ignore_permission= True
+            address.insert(ignore_permissions=True)
+            address.save()
+            
+        address.update({
+            "shopify_id": address_data.get("id"),
+            "address_line1": address_data.get("address1"),
+            "address_type" : "Shipping",
+            "address_line2": address_data.get("address2"),
+            "city": address_data.get("city"),
+            "state": address_data.get("province"),
+            "country": address_data.get("country"),
+            "pincode": address_data.get("zip"),
+            "phone": address_data.get("phone"),
+            "address_title": f"{address_data.get('first_name', '')}",
+            "address_type": "Shipping"
+        })
+        address.flags.ignore_permissions = True
+        address.save()
+        frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name, update_modified = False)
+    contact = None
+    contact_name = frappe.db.get_value(
+        "Dynamic Link",
+        {
+            "link_doctype": "Customer",
+            "link_name": customer.name,
+            "parenttype": "Contact"
+        },
+        "parent"
+    )
+
+    if contact_name:
+        contact = frappe.get_doc("Contact", contact_name)
+
+    if not contact:
+        contact = frappe.new_doc("Contact")
+        contact.first_name = address_data.get("first_name")
+        contact.middle_name = address_data.get("middle_name") or ""
+        contact.last_name = address_data.get("last_name")
+        if order_data.get("email"):
+            contact.append("email_ids", {
+                "email_id": order_data.get("email"),
+                "is_primary": 1,
+            })
+        if order_data.get("phone"):
+            contact.append("phone_nos", {
+                "phone": order_data.get("phone"),
+                "is_primary_phone": 1,
+                "is_primary_mobile_no":1
+            })
+        contact.append("links", {
+            "link_doctype": "Customer",
+            "link_name": customer.name,
+        })
+        contact.flags.ignore_permissions = True
+        contact.insert(ignore_permissions=True)
+        frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
+        contact.save()
+    else:
+        contact.update({
+            "first_name": address_data.get("first_name"),
+            "middle_name": address_data.get("middle_name") or "",
+            "last_name": address_data.get("last_name")
+        })
+        if order_data.get("email"):
+            contact.set("email_ids", [{
+                "email_id": order_data.get("email"),
+                "is_primary": 1
+            }])
+        if order_data.get("phone"):
+            contact.set("phone_nos", [{
+                "phone": order_data.get("phone"),
+                "is_primary_phone": 1,
+                "is_primary_mobile_no":1
+            }])
+        contact.flags.ignore_permissions = True
+        contact.save()
+        
+        
+        
+        
+@frappe.whitelist(allow_guest=True)
 def product_creation():
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     shopify_webhook_secret = shopify_keys.shopify_webhook_secret
@@ -483,7 +701,6 @@ def product_creation():
 
     if shopify_keys.sync_product:
         order_data = frappe.parse_json(request_body.decode("utf-8"))
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>",order_data)
         product_id = order_data.get("id")
         inventory_item_id = None
         item_code = ""
@@ -802,7 +1019,6 @@ def product_update():
         shopify_images_map = {img.get("id"): img.get("src") for img in images}
 
         for v in variants:
-            print("_______________________________________",v)
             variant_doc_name = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
             variant = None
 
@@ -842,7 +1058,6 @@ def product_update():
             
             variant.flags.ignore_permissions = True
             variant.save()
-            # frappe.db.commit()
             
 
             variant_image_id = v.get("image_id")
@@ -858,7 +1073,6 @@ def product_update():
                         frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
                     variant.image = None
                     variant.save()
-                    # frappe.db.commit()
             else:
                 if variant_image_url:
                     file_doc_name = frappe.db.exists("File", {"file_url": variant_image_url})
@@ -875,19 +1089,10 @@ def product_update():
                         variant.image = file_doc.file_url
                     else:
                         variant.image = variant_image_url
-                    print("@@@@@@@@@@@@@@@@@@@@@@@",variant.custom_send_to_shopify)
                     variant.save()
-                    # frasppe.db.commit()
-
-    # if update_item:
-    #     item.flags.ignore_permissions = True
-    #     item.save()
-        
 
     frappe.log_error(title="Product Update", message="Completed")
     return "Product updated successfully."
-
-
 
 
 
@@ -918,111 +1123,148 @@ def get_hsn_from_metafields(product_data, settings):
                         hsn_code = hs.name
 
                     return hsn_code
-    else:
-        frappe.log_error("Error:", response.status_code, response.text)
 
     return None
 
 
-@frappe.whitelist(allow_guest=True)
-def get_inventory_level():
-    raw_request_body = frappe.local.request.get_data()
-    shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
-    try:
-        settings_for_secret = frappe.get_single("Shopify Connector Setting")
-        shopify_webhook_secret = settings_for_secret.shopify_webhook_secret
+# @frappe.whitelist(allow_guest=True)
+# def get_inventory_level():
 
-        if not shopify_webhook_secret:
-            frappe.throw(
-                _(
-                    "Webhook secret not configured. Please set it up in Shopify Connector Setting."
-                ),
-                frappe.ValidationError,
-            )
+#     raw_request_body = frappe.local.request.get_data()
+#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+#     try:
+#         settings_doc = frappe.get_single("Shopify Connector Setting")
+#         shopify_webhook_secret = settings_doc.shopify_webhook_secret
 
-        secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+#         if not shopify_webhook_secret:
+#             frappe.throw(_("Webhook secret not configured in Shopify Connector Setting."), frappe.ValidationError)
 
-        calculated_hmac = base64.b64encode(
-            hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
-        )
-        if not hmac.compare_digest(
-            calculated_hmac, shopify_hmac_header.encode("utf-8")
-        ):
-            frappe.throw(
-                _("Unauthorized: Invalid webhook signature."), frappe.PermissionError
-            )
+#         secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+#         calculated_hmac = base64.b64encode(
+#             hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
+#         )
 
-    except Exception as e:
-        frappe.log_error(
-            frappe.get_traceback(), "Shopify Webhook Unexpected Verification Error"
-        )
-        frappe.throw(
-            _(f"An unexpected error occurred during webhook verification: {e}")
-        )
+#         if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
+#             frappe.log_error(title="Unauthorized: Invalid webhook signature.", message="Check Webhook Secret")
 
-    inv_level = json.loads(raw_request_body.decode("utf-8"))
+#     except Exception as e:
+#         frappe.log_error(title="Check the Webhook Secret",message= f"Unexpected error during webhook verification: {e}")
 
-    if inv_level.get("available") != 0:
-        item = frappe.db.get_value("Item", {"custom_inventory_item_id": inv_level.get("inventory_item_id")},"name")
-        item_doc = frappe.get_doc("Item",item)
-        warehouse = frappe.db.get_value("Warehouse",{"custom_shopify_id":inv_level.get("location_id")},"name")
+#     inv_level = json.loads(raw_request_body.decode("utf-8"))
+#     print(inv_level)
+#     inventory_item_id = inv_level.get("inventory_item_id")
+#     location_id = inv_level.get("location_id")
+#     available_qty = inv_level.get("available")
+
+#     if inventory_item_id and location_id is not None:
+#         item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
+
+#         settings_doc = frappe.get_single("Shopify Connector Setting")
+#         erpnext_warehouse = None
+
+#         for mapping in settings_doc.get("warehouse_setting"):
+#             if str(mapping.shopify_id) == str(location_id):
+#                 erpnext_warehouse = mapping.erpnext_warehouse
+#                 break
+
+#         if not item_code or not erpnext_warehouse:
+#             frappe.log_error(
+#                 f"Missing mapping for item: {inventory_item_id} or location: {location_id}",
+#                 "Shopify Inventory Sync"
+#             )
+#             return
+
+#         bin_doc = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse}, "name")
+
+#         if bin_doc:
+#             bin_doc = frappe.get_doc("Bin", bin_doc)
+#             old_qty = bin_doc.actual_qty
+#             bin_doc.actual_qty = available_qty
+#             bin_doc.save(ignore_permissions=True)
+
+#             frappe.log_error(
+#                 title=f"Bin level Updated for {item_code}",
+#                 message=f"{item_code} in {erpnext_warehouse} updated from {old_qty} to {available_qty}"
+#             )
+#         else:
+#             try:
+#                 bin_doc = frappe.get_doc({
+#                     "doctype": "Bin",
+#                     "item_code": item_code,
+#                     "warehouse": erpnext_warehouse,
+#                     "actual_qty": available_qty,
+#                 })
+#                 bin_doc.insert(ignore_permissions=True)
+
+#                 frappe.log_error(
+#                     title=f"Bin Created for {item_code}",
+#                     message=f"New bin for {item_code} in {erpnext_warehouse} created with qty {available_qty}"
+#                 )
+#             except Exception as e:
+#                 frappe.log_error(frappe.get_traceback(), "Error creating Bin for Shopify Inventory Sync")
+#                 frappe.throw(_(f"Error creating new bin: {e}"))
+
+
+
+# @frappe.whitelist(allow_guest=True)
+# def get_inventory_update():
+#     raw_request_body = frappe.local.request.get_data()
+#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+
+#     try:
+#         settings_doc = frappe.get_single("Shopify Connector Setting")
+#         shopify_webhook_secret = settings_doc.shopify_webhook_secret
+
+#         if not shopify_webhook_secret:
+#             frappe.throw(
+#                 _("Webhook secret not configured. Please set it up in Shopify Connector Setting."),
+#                 frappe.ValidationError,
+#             )
+
+#         calculated_hmac = base64.b64encode(
+#             hmac.new(shopify_webhook_secret.encode(), raw_request_body, hashlib.sha256).digest()
+#         )
+
+#         if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
+#             frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
+
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Shopify Webhook Verification Error")
+
+#     inv_data = json.loads(raw_request_body.decode("utf-8"))
+#     print(inv_data,"\n\n\n\n")
+#     inventory_item_id = inv_data.get("inventory_item_id")
+#     location_id = inv_data.get("location_id")
+#     available_qty = inv_data.get("available")
+
+#     if not (inventory_item_id and location_id and available_qty is not None):
+#         frappe.throw(_("Missing required fields in webhook payload"))
+
+#     item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
+
+#     erpnext_warehouse = None
+#     for mapping in settings_doc.get("warehouse_setting"):
+#         if str(mapping.shopify_id) == str(location_id):
+#             erpnext_warehouse = mapping.erpnext_warehouse
+#             break
+
+#     if not item_code or not erpnext_warehouse:
+#         frappe.log_error(f"Mapping not found for item: {inventory_item_id} or location: {location_id}","Shopify Inventory Update")
+#         return
+
+#     try:
+#         bin_doc = frappe.get_doc("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse})
+#         old_qty = bin_doc.actual_qty
+#         bin_doc.actual_qty = available_qty
+#         bin_doc.save(ignore_permissions=True)
+#         frappe.log_error(f"[Shopify Inventory Update] {item_code} in {erpnext_warehouse} changed from {old_qty} → {available_qty}")
         
-        se = frappe.new_doc("Stock Entry")
-        se.stock_entry_type = "Material Receipt"
-        se.append("items",{
-            "item_code": item,
-            "t_warehouse":warehouse,
-            "qty": inv_level.get("available"),
-            "basic_rate": item_doc.shopify_selling_rate,
-            "uom":"Nos"
-        })
-        se.flags.ignore_permissions = True
-        se.flags.ignore_mandatory = True
-        se.insert()
-        se.submit()
+#     except frappe.DoesNotExistError:
+#         frappe.log_error(f"Bin not found for Item: {item_code}, Warehouse: {erpnext_warehouse}","Shopify Inventory Update")
+#     except Exception as e:
+#         frappe.log_error(frappe.get_traceback(), "Error updating Bin for Shopify Inventory Update")
 
-
-@frappe.whitelist(allow_guest=True)
-def get_inventory_update():
-    raw_request_body = frappe.local.request.get_data()
-    shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
-    try:
-        settings_for_secret = frappe.get_single("Shopify Connector Setting")
-        shopify_webhook_secret = settings_for_secret.shopify_webhook_secret
-
-        if not shopify_webhook_secret:
-            frappe.throw(
-                _(
-                    "Webhook secret not configured. Please set it up in Shopify Connector Setting."
-                ),
-                frappe.ValidationError,
-            )
-
-        secret_key_bytes = shopify_webhook_secret.encode("utf-8")
-
-        calculated_hmac = base64.b64encode(
-            hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
-        )
-        if not hmac.compare_digest(
-            calculated_hmac, shopify_hmac_header.encode("utf-8")
-        ):
-            frappe.throw(
-                _("Unauthorized: Invalid webhook signature."), frappe.PermissionError
-            )
-
-    except Exception as e:
-        frappe.log_error(
-            frappe.get_traceback(), "Shopify Webhook Unexpected Verification Error"
-        )
-        frappe.throw(
-            _(f"An unexpected error occurred during webhook verification: {e}")
-        )
-
-    inv_data = json.loads(raw_request_body.decode("utf-8"))
-    location_id = inv_data.get("location_id")
-    if location_id:
-        frappe.cache().set_value("shopify_last_location_id", location_id)
-    return location_id
+#     return f"{item_code} updated to {available_qty} in {erpnext_warehouse}"
 
 
 
@@ -1030,220 +1272,6 @@ def get_inventory_update():
 
 
 
-@frappe.whitelist(allow_guest=True)
-def customer_update():
-    raw_request_body = frappe.local.request.get_data()
-    shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
-
-    settings = frappe.get_single("Shopify Connector Setting")
-    try:
-        shopify_webhook_secret = settings.shopify_webhook_secret
-
-        if not shopify_webhook_secret:
-            frappe.throw(
-                _("Webhook secret not configured. Please set it up in Shopify Connector Setting."),
-                frappe.ValidationError,
-            )
-
-        if not shopify_hmac_header:
-            frappe.throw(_("Unauthorized: Webhook signature missing."), frappe.PermissionError)
-
-        secret_key_bytes = shopify_webhook_secret.encode("utf-8")
-        calculated_hmac = base64.b64encode(
-            hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
-        ).decode()
-
-        if not hmac.compare_digest(calculated_hmac, shopify_hmac_header):
-            frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
-
-    except Exception as e:
-        frappe.throw(_(f"Webhook verification error: {e}"))
-
-    order_data = frappe.parse_json(raw_request_body.decode("utf-8"))
-
-    user = frappe.session.user = settings.webhook_session_user 
-    if not user:
-        frappe.log_error("Webhook User: Not Configure in Shopify Connector Setting")
-    
-    shopify_id = order_data.get("id")
-    
-    headers = {
-            'Content-Type': 'application/json',
-            'X-Shopify-Access-Token': f'{settings.access_token}',
-        }
-
-    json_data = {
-        'query': 'query getCustomerTags($id: ID!) { customer(id: $id) { id tags } }',
-        'variables': {
-            'id': f'gid://shopify/Customer/{shopify_id}',
-        },
-    }
-
-    response = requests.post(f'https://{settings.shop_url}/admin/api/{settings.shopify_api_version}/graphql.json', headers=headers, json=json_data)
-    response_data = response.json()
-    tag = ""
-    tags = response_data.get("data", {}).get("customer", {}).get("tags", [])
-    if tags:
-        tag = tags[0]
-        if not frappe.db.exists("Customer Group", {"customer_group_name": tag}):
-            customer_group = frappe.new_doc("Customer Group")
-            customer_group.customer_group_name = tag
-            customer_group.flags.ignore_permissions = True
-            customer_group.insert(ignore_permissions=True)
-    else:
-        tag = settings.customer_group
-        
-        
-    if not shopify_id:
-        frappe.throw(_("Shopify customer ID is missing in the payload."))
-
-    customer_name = ""
-    if order_data.get("first_name") or order_data.get("last_name"):
-        customer_name = f"{order_data.get('first_name', '')} {order_data.get('last_name', '')}".strip()
-    if not order_data.get("last_name"):
-        customer_name = order_data.get("first_name")
-        
-    if frappe.db.exists("Customer", {"shopify_id": shopify_id}):
-        customer = frappe.get_doc("Customer", {"shopify_id": shopify_id})
-
-        if not customer:
-            frappe.msgprint(_("Customer not found with Shopify ID."))
-            return
-        customer.flags.ignore_permissions = True
-        customer.customer_name = customer_name
-        customer.shopify_email = order_data.get("email")
-        customer.customer_group = tag
-        customer.default_currency = order_data.get("currency")
-        customer.custom_ignore_address_update = True
-        customer.flags.from_shopify = True
-        customer.save()
-    else :
-        customer= frappe.new_doc("Customer")
-        customer.customer_name = customer_name
-        customer.shopify_id = order_data.get("id")
-        customer.shopify_email = order_data.get("email") or ""
-        customer.customer_group = tag
-        customer.default_currency= order_data.get("currency")
-        customer.custom_ignore_address_update = True
-        customer.flags.from_shopify = True
-        customer.flags.ignore_permissions = True
-        customer.insert(ignore_mandatory=True)
-        customer.save()
-        if frappe.db.exists("Territory", order_data.get("default_address", {}).get("province")):
-            customer.territory = order_data.get("default_address", {}).get("province")
-        else:
-            customer.territory = settings.territory 
-        customer.save()
-        
-    state = ""
-    pincode = ""
-    if order_data.get("default_address"):
-        state = order_data.get("default_address").get("province") 
-        pincode = order_data.get("default_address").get("zip")
-
-    address_data = order_data.get("default_address")
-    if state and pincode:
-
-        address = frappe.db.exists("Address",{"shopify_id": address_data.get("id")})
-        if not address:
-            address = frappe.db.get_value("Dynamic Link", {"link_doctype": "Customer", "link_name": customer.name, "parenttype": "Address"}, "parent")
-        if address:
-            address = frappe.get_doc("Address", address)
-        else:
-            address = frappe.new_doc("Address")
-            address.address_title = address_data.get("first_name")
-            address.address_type = "Shipping"
-            address.shopify_id = address_data.get("id")
-            address.address_line1 = address_data.get("address1") or address_data.get("address2")
-            address.address_line2 = address_data.get("address2")
-            address.city = address_data.get("city")
-            address.state = address_data.get("province")
-            address.country = address_data.get("country")
-            address.pincode = address_data.get("zip")
-            address.phone = address_data.get("phone")
-            address.first_name = address_data.get("first_name")
-            address.last_name = address_data.get("last_name")
-            address.append("links", {
-                "link_doctype": "Customer",
-                "link_name": customer.name,
-            })
-            address.flags.ignore_permission= True
-            address.insert(ignore_permissions=True)
-            address.save()
-            
-        address.update({
-            "shopify_id": address_data.get("id"),
-            "address_line1": address_data.get("address1"),
-            "address_type" : "Shipping",
-            "address_line2": address_data.get("address2"),
-            "city": address_data.get("city"),
-            "state": address_data.get("province"),
-            "country": address_data.get("country"),
-            "pincode": address_data.get("zip"),
-            "phone": address_data.get("phone"),
-            "address_title": f"{address_data.get('first_name', '')}",
-            "address_type": "Shipping"
-        })
-        address.flags.ignore_permissions = True
-        address.save()
-        frappe.db.set_value("Customer" ,customer.name, "customer_primary_address" , address.name, update_modified = False)
-    contact = None
-    contact_name = frappe.db.get_value(
-        "Dynamic Link",
-        {
-            "link_doctype": "Customer",
-            "link_name": customer.name,
-            "parenttype": "Contact"
-        },
-        "parent"
-    )
-
-    if contact_name:
-        contact = frappe.get_doc("Contact", contact_name)
-
-    if not contact:
-        contact = frappe.new_doc("Contact")
-        contact.first_name = address_data.get("first_name")
-        contact.middle_name = address_data.get("middle_name") or ""
-        contact.last_name = address_data.get("last_name")
-        if order_data.get("email"):
-            contact.append("email_ids", {
-                "email_id": order_data.get("email"),
-                "is_primary": 1,
-            })
-        if order_data.get("phone"):
-            contact.append("phone_nos", {
-                "phone": order_data.get("phone"),
-                "is_primary_phone": 1,
-                "is_primary_mobile_no":1
-            })
-        contact.append("links", {
-            "link_doctype": "Customer",
-            "link_name": customer.name,
-        })
-        contact.flags.ignore_permissions = True
-        contact.insert(ignore_permissions=True)
-        frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
-        contact.save()
-    else:
-        contact.update({
-            "first_name": address_data.get("first_name"),
-            "middle_name": address_data.get("middle_name") or "",
-            "last_name": address_data.get("last_name")
-        })
-        if order_data.get("email"):
-            contact.set("email_ids", [{
-                "email_id": order_data.get("email"),
-                "is_primary": 1
-            }])
-        if order_data.get("phone"):
-            contact.set("phone_nos", [{
-                "phone": order_data.get("phone"),
-                "is_primary_phone": 1,
-                "is_primary_mobile_no":1
-            }])
-        contact.flags.ignore_permissions = True
-        contact.save()
 
 
 
