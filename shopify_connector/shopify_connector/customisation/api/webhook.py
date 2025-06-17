@@ -1082,7 +1082,7 @@ def product_update():
     options = product_data.get("options", [])
     item_group = product_data.get("product_type") or settings.item_group
     hsn_code_parent = get_hsn_from_metafields(product_data, settings)
-    hsn_code, uom = hsn_code_parent
+    hsn_code, uom = hsn_code_parent if hsn_code_parent else (None, settings.uom)
 
     if not frappe.db.exists("Item Group", {"name": item_group}):
         item_group_doc = frappe.new_doc("Item Group")
@@ -1219,28 +1219,33 @@ def product_update():
         for v in variants:
             variant_doc_name = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
             variant = None
+            existing_item_name = None
+
 
             if variant_doc_name:
+                print("variant_doc_name,",variant_doc_name)
                 variant = frappe.get_doc("Item", variant_doc_name)
             else:
                 existing_item_name = frappe.db.exists("Item", {"item_code": v.get("sku")})
+                print("existing_item_name",existing_item_name)
                 if existing_item_name:
-                    existing_variant = frappe.get_doc("Item", existing_item_name)
-                    if existing_variant.variant_of and existing_variant.variant_of != item.name:
-                        continue
-                    if not existing_variant.variant_of:
-                        frappe.delete_doc("Item", existing_item_name, ignore_permissions=True)
-                    variant = frappe.new_doc("Item")
+                    variant = frappe.get_doc("Item", existing_item_name)
+                    # if existing_variant.variant_of and existing_variant.variant_of != item.name:
+                    #     continue
+                    # if not existing_variant.variant_of:
+                    #     frappe.delete_doc("Item", existing_item_name, ignore_permissions=True)
+                    # variant = frappe.new_doc("Item")
                 else:
                     variant = frappe.new_doc("Item")
                     
 
-            variant.item_code = f"{item.item_code}-{v.get('sku')}"
+            if not existing_item_name:
+                variant.item_code = f"{product_data.get('title')}-{v.get('sku')}"
             variant.item_name = f"{product_data.get('title')}-{v.get('title')}"
             variant.item_group = item_group
             variant.variant_of = item.name
             variant.custom_send_to_shopify = True
-            variant.stock_uom = uom
+            variant.stock_uom = item.stock_uom
             variant.gst_hsn_code = hsn_code
             variant.shopify_selling_rate = v.get("price") or 0.0
             variant.custom_variant_id = v.get("id")
@@ -1253,8 +1258,8 @@ def product_update():
                     variant.append("attributes", {"attribute": options[i]["name"], "attribute_value": val})
 
             variant.flags.ignore_permissions = True
+            print(variant.__dict__,"|||||||||||||||||||")
             variant.save()
-
             variant_image_id = v.get("image_id")
             variant_image_url = shopify_images_map.get(variant_image_id)
             if variant_image_id is None:
@@ -1301,12 +1306,11 @@ def get_hsn_from_metafields(product_data, settings):
     url = f'https://{settings.shop_url}/admin/api/2023-10/products/{product_data.get("id")}/metafields.json'
 
     response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    
+    response.raise_for_status()    
 
     metafields = response.json().get('metafields', [])
     hsn_code = None
-    label = None
+    metaobject_gid = None
 
     for metafield in metafields:
         if metafield.get('namespace') == 'custom':
@@ -1327,7 +1331,7 @@ def get_hsn_from_metafields(product_data, settings):
                 metaobject_gid = metafield.get('value')
                 
 
-    if hsn_code or label:
+    if hsn_code or metaobject_gid:
         return hsn_code, metaobject_gid
 
     return None

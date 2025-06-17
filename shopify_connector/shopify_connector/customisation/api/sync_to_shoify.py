@@ -321,8 +321,7 @@ def get_current_domain_name() -> str:
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_item_to_shopify(doc, method):
-    if getattr(doc, "from_webhook", False):
-        return
+
     from_desk = validate_api_path()
     if not from_desk:
         return
@@ -350,6 +349,7 @@ def send_item_to_shopify(doc, method):
         return
 
     site_url = get_current_domain_name()
+    print(site_url)
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
@@ -361,12 +361,12 @@ def send_item_to_shopify(doc, method):
     if parent_doc_for_payload.image:
         if not site_url.startswith("http"):
             site_url = "https://" + site_url
-        image_url = site_url + parent_doc_for_payload.image
+        image_url = "https://" + site_url + parent_doc_for_payload.image
     elif parent_doc_for_payload.has_variants or parent_doc_for_payload.name != item_triggering_sync.name:
         variants = frappe.get_all("Item", filters={"variant_of": parent_doc_for_payload.name}, fields=["image"])
         for variant in variants:
             if variant.image:
-                image_url = site_url + variant.image if not variant.image.startswith("http") else variant.image
+                image_url =  "https://" + site_url + variant.image if not variant.image.startswith("http") else variant.image
                 break
 
     product_payload = {
@@ -383,7 +383,9 @@ def send_item_to_shopify(doc, method):
     }
 
     if image_url:
+        print("||||||||||||||||",image_url)
         product_payload["product"]["images"].append({"src": image_url})
+        print(product_payload)
 
     if frappe_template_item_name:
         all_variant_items_from_frappe = frappe.get_all(
@@ -462,7 +464,7 @@ def send_item_to_shopify(doc, method):
             variants_to_send_to_shopify.append(variant_data)
 
             if variant_doc.image and variant_doc.custom_variant_id:
-                variant_image_url = site_url + variant_doc.image
+                variant_image_url = "https://" + site_url + variant_doc.image
                 if {"src": variant_image_url} not in images_to_send_to_shopify and {"src": variant_image_url} not in product_payload["product"]["images"]:
                     images_to_send_to_shopify.append({"src": variant_image_url, "variant_ids": [variant_doc.custom_variant_id]})
 
@@ -523,7 +525,8 @@ def send_item_to_shopify(doc, method):
             "key": "hsn",
             "value": str([int(hsn_code)]),
             # "value": int(hsn_code),
-            "type": "number_integer"
+            # "type": "number_integer"
+            "type":"list.number_integer"
         },
         {
             "namespace": "custom",
