@@ -708,10 +708,10 @@ def product_creation():
             item_code = v.get("sku")
             inventory_item_id = v.get("inventory_item_id")
 
-        settings = frappe.get_doc("Shopify Connector Setting")
         status = False
         price = 0
         hsn_code_shopify = get_hsn_from_metafields(order_data, shopify_keys)
+        hsn_code, uom = hsn_code_shopify
 
         for prices in order_data.get("variants", []):
             price = prices.get("price")
@@ -737,10 +737,10 @@ def product_creation():
         item = frappe.new_doc("Item")
         item.item_code = order_data.get("title")
         item.item_name = order_data.get("title")
-        item.gst_hsn_code = hsn_code_shopify
+        item.gst_hsn_code = hsn_code
         item.description = order_data.get("body_html")
         item.item_group = item_group
-        item.stock_uom = settings.uom
+        item.stock_uom = uom
         item.shopify_id = product_id
         item.custom_inventory_item_id = inventory_item_id
         item.custom_send_to_shopify = 1
@@ -795,11 +795,11 @@ def product_creation():
                 variant.item_name = order_data.get("title") + "-" + v.get("title")
                 variant.item_group = item_group
                 variant.variant_of = item.name
-                variant.stock_uom = item.stock_uom
+                variant.stock_uom = uom
                 variant.custom_send_to_shopify = 1
                 variant.shopify_selling_rate = v.get("price")
                 variant.custom_variant_id = v.get("id")
-                variant.gst_hsn_code = hsn_code_shopify
+                variant.gst_hsn_code = hsn_code
                 variant.custom_inventory_item_id = v.get("inventory_item_id")
 
                 variant_options = [v.get("option1"), v.get("option2"), v.get("option3")]
@@ -846,14 +846,7 @@ def product_creation():
 
 @frappe.whitelist(allow_guest=True)
 def product_update():
-    # print("URLLLLLLLLLLLLLLLLLLLL", frappe.request.url)
-    # url = frappe.request.url
-    # # print(url.split("//")[1].split("/", 2)[-2])
-    # path = url.split("//")[1].split("/", 2)[-2] if "//" in url else url.split("/", 1)[-1]
-    # # print(path)
-    # endpoint_key = path.split("/")[0] if path else ""
-    # print("KEYYYYYYYYYYYYYYYYY", endpoint_key)
-    # print("!!!!!!!!!>>>>>>>>>>>>>>>>>>>>")
+    frappe.local.flags.skip_shopify_webhook = True
     raw_request_body = frappe.local.request.get_data()
     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
     settings = frappe.get_single("Shopify Connector Setting")
@@ -870,10 +863,12 @@ def product_update():
         frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
 
     product_data = json.loads(raw_request_body.decode("utf-8"))
+    print(product_data)
     product_id = product_data.get("id")
     options = product_data.get("options", [])
     item_group = product_data.get("product_type") or settings.item_group
     hsn_code_parent = get_hsn_from_metafields(product_data, settings)
+    hsn_code, uom = hsn_code_parent
     
     if not frappe.db.exists("Item Group", {"name": item_group}):
         item_group_doc = frappe.new_doc("Item Group")
@@ -896,8 +891,8 @@ def product_update():
         item.item_name = product_data.get("title")
         item.description = product_data.get("body_html")
         item.item_group = item_group
-        item.gst_hsn_code = hsn_code_parent
-        item.stock_uom = settings.uom
+        item.gst_hsn_code = hsn_code
+        item.stock_uom = uom
         item.custom_send_to_shopify = 1
         item.disabled = product_data.get("status") == "draft"
         item.flags.ignore_permissions = True
@@ -937,8 +932,8 @@ def product_update():
     item.item_name = product_data.get("title")
     item.description = product_data.get("body_html")
     item.item_group = item_group
-    item.stock_uom = settings.uom
-    item.gst_hsn_code = hsn_code_parent
+    item.stock_uom = uom
+    item.gst_hsn_code = hsn_code
     item.shopify_id = product_id
     item.custom_send_to_shopify = 1
     item.disabled = product_data.get("status") == "draft"
@@ -957,28 +952,6 @@ def product_update():
                 pass
     
     else:
-        # item.has_variants = 1
-        # item.set("attributes", [])
-        # for opt in options:
-        #     attr_name = opt["name"]
-        #     if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
-        #         attr_doc = frappe.new_doc("Item Attribute")
-        #         attr_doc.attribute_name = attr_name
-        #         attr_doc.flags.ignore_permissions = True
-        #         # attr_doc.insert()
-        #     else:
-        #         attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
-
-        #     existing_vals = frappe.get_all("Item Attribute Value", filters={"parent": attr_name}, pluck="attribute_value")
-        #     for val in opt["values"]:
-        #         if val not in existing_vals:
-        #             attr_doc.append("item_attribute_values", {"attribute_value": val, "abbr": val})
-
-        #     attr_doc.flags.ignore_permissions = True
-        #     attr_doc.save()
-        #     item.append("attributes", {"attribute": attr_name})
-        #     # frappe.db.commit()
-        #     item.save()
         item.has_variants = 1
 
         new_attr_names = [opt["name"] for opt in options]
@@ -1043,8 +1016,8 @@ def product_update():
             variant.item_group = item_group
             variant.variant_of = item.name
             variant.custom_send_to_shopify = True
-            variant.stock_uom = settings.uom
-            variant.gst_hsn_code = hsn_code_parent
+            variant.stock_uom = uom
+            variant.gst_hsn_code = hsn_code
             variant.shopify_selling_rate = v.get("price") or 0.0
             variant.custom_variant_id = v.get("id")
             variant.custom_inventory_item_id = v.get("inventory_item_id")
@@ -1095,7 +1068,6 @@ def product_update():
     return "Product updated successfully."
 
 
-
 def get_hsn_from_metafields(product_data, settings):
     headers = {
         'Content-Type': 'application/json',
@@ -1105,11 +1077,17 @@ def get_hsn_from_metafields(product_data, settings):
     url = f'https://{settings.shop_url}/admin/api/2023-10/products/{product_data.get("id")}/metafields.json'
 
     response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    
+    frappe.log_error(title="HSN Response Check",message=response.json())
 
-    if response.status_code == 200:
-        metafields = response.json().get('metafields', [])
-        for metafield in metafields:
-            if metafield.get('namespace') == 'custom' and metafield.get('key') == 'hsn':
+    metafields = response.json().get('metafields', [])
+    hsn_code = None
+    label = None
+
+    for metafield in metafields:
+        if metafield.get('namespace') == 'custom':
+            if metafield.get('key') == 'hsn':
                 hsn_code = metafield.get('value')
                 if hsn_code:
                     try:
@@ -1122,195 +1100,13 @@ def get_hsn_from_metafields(product_data, settings):
                         hs.insert(ignore_permissions=True)
                         hsn_code = hs.name
 
-                    return hsn_code
+            elif metafield.get('key') == 'default_unit_of_measure':
+                metaobject_gid = metafield.get('value')
+
+    if hsn_code or label:
+        return hsn_code, metaobject_gid
 
     return None
-
-
-# @frappe.whitelist(allow_guest=True)
-# def get_inventory_level():
-
-#     raw_request_body = frappe.local.request.get_data()
-#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
-#     try:
-#         settings_doc = frappe.get_single("Shopify Connector Setting")
-#         shopify_webhook_secret = settings_doc.shopify_webhook_secret
-
-#         if not shopify_webhook_secret:
-#             frappe.throw(_("Webhook secret not configured in Shopify Connector Setting."), frappe.ValidationError)
-
-#         secret_key_bytes = shopify_webhook_secret.encode("utf-8")
-#         calculated_hmac = base64.b64encode(
-#             hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest()
-#         )
-
-#         if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
-#             frappe.log_error(title="Unauthorized: Invalid webhook signature.", message="Check Webhook Secret")
-
-#     except Exception as e:
-#         frappe.log_error(title="Check the Webhook Secret",message= f"Unexpected error during webhook verification: {e}")
-
-#     inv_level = json.loads(raw_request_body.decode("utf-8"))
-#     print(inv_level)
-#     inventory_item_id = inv_level.get("inventory_item_id")
-#     location_id = inv_level.get("location_id")
-#     available_qty = inv_level.get("available")
-
-#     if inventory_item_id and location_id is not None:
-#         item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
-
-#         settings_doc = frappe.get_single("Shopify Connector Setting")
-#         erpnext_warehouse = None
-
-#         for mapping in settings_doc.get("warehouse_setting"):
-#             if str(mapping.shopify_id) == str(location_id):
-#                 erpnext_warehouse = mapping.erpnext_warehouse
-#                 break
-
-#         if not item_code or not erpnext_warehouse:
-#             frappe.log_error(
-#                 f"Missing mapping for item: {inventory_item_id} or location: {location_id}",
-#                 "Shopify Inventory Sync"
-#             )
-#             return
-
-#         bin_doc = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse}, "name")
-
-#         if bin_doc:
-#             bin_doc = frappe.get_doc("Bin", bin_doc)
-#             old_qty = bin_doc.actual_qty
-#             bin_doc.actual_qty = available_qty
-#             bin_doc.save(ignore_permissions=True)
-
-#             frappe.log_error(
-#                 title=f"Bin level Updated for {item_code}",
-#                 message=f"{item_code} in {erpnext_warehouse} updated from {old_qty} to {available_qty}"
-#             )
-#         else:
-#             try:
-#                 bin_doc = frappe.get_doc({
-#                     "doctype": "Bin",
-#                     "item_code": item_code,
-#                     "warehouse": erpnext_warehouse,
-#                     "actual_qty": available_qty,
-#                 })
-#                 bin_doc.insert(ignore_permissions=True)
-
-#                 frappe.log_error(
-#                     title=f"Bin Created for {item_code}",
-#                     message=f"New bin for {item_code} in {erpnext_warehouse} created with qty {available_qty}"
-#                 )
-#             except Exception as e:
-#                 frappe.log_error(frappe.get_traceback(), "Error creating Bin for Shopify Inventory Sync")
-#                 frappe.throw(_(f"Error creating new bin: {e}"))
-
-
-
-# @frappe.whitelist(allow_guest=True)
-# def get_inventory_update():
-#     raw_request_body = frappe.local.request.get_data()
-#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
-
-#     try:
-#         settings_doc = frappe.get_single("Shopify Connector Setting")
-#         shopify_webhook_secret = settings_doc.shopify_webhook_secret
-
-#         if not shopify_webhook_secret:
-#             frappe.throw(
-#                 _("Webhook secret not configured. Please set it up in Shopify Connector Setting."),
-#                 frappe.ValidationError,
-#             )
-
-#         calculated_hmac = base64.b64encode(
-#             hmac.new(shopify_webhook_secret.encode(), raw_request_body, hashlib.sha256).digest()
-#         )
-
-#         if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
-#             frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
-
-#     except Exception as e:
-#         frappe.log_error(frappe.get_traceback(), "Shopify Webhook Verification Error")
-
-#     inv_data = json.loads(raw_request_body.decode("utf-8"))
-#     print(inv_data,"\n\n\n\n")
-#     inventory_item_id = inv_data.get("inventory_item_id")
-#     location_id = inv_data.get("location_id")
-#     available_qty = inv_data.get("available")
-
-#     if not (inventory_item_id and location_id and available_qty is not None):
-#         frappe.throw(_("Missing required fields in webhook payload"))
-
-#     item_code = frappe.db.get_value("Item", {"custom_inventory_item_id": inventory_item_id}, "name")
-
-#     erpnext_warehouse = None
-#     for mapping in settings_doc.get("warehouse_setting"):
-#         if str(mapping.shopify_id) == str(location_id):
-#             erpnext_warehouse = mapping.erpnext_warehouse
-#             break
-
-#     if not item_code or not erpnext_warehouse:
-#         frappe.log_error(f"Mapping not found for item: {inventory_item_id} or location: {location_id}","Shopify Inventory Update")
-#         return
-
-#     try:
-#         bin_doc = frappe.get_doc("Bin", {"item_code": item_code, "warehouse": erpnext_warehouse})
-#         old_qty = bin_doc.actual_qty
-#         bin_doc.actual_qty = available_qty
-#         bin_doc.save(ignore_permissions=True)
-#         frappe.log_error(f"[Shopify Inventory Update] {item_code} in {erpnext_warehouse} changed from {old_qty} → {available_qty}")
-        
-#     except frappe.DoesNotExistError:
-#         frappe.log_error(f"Bin not found for Item: {item_code}, Warehouse: {erpnext_warehouse}","Shopify Inventory Update")
-#     except Exception as e:
-#         frappe.log_error(frappe.get_traceback(), "Error updating Bin for Shopify Inventory Update")
-
-#     return f"{item_code} updated to {available_qty} in {erpnext_warehouse}"
-
-
-
-
-
-@frappe.whitelist(allow_guest=True)
-def delete_customer_webhook():
-
-    raw_request_body = frappe.local.request.get_data()
-    shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
-
-    try:
-        settings = frappe.get_single("Shopify Connector Setting")
-        secret = settings.shopify_webhook_secret
-
-        if not secret:
-            frappe.throw("Webhook secret not set in Shopify Connector Setting.")
-
-        secret_bytes = secret.encode("utf-8")
-        calculated_hmac = base64.b64encode(
-            hmac.new(secret_bytes, raw_request_body, hashlib.sha256).digest()
-        )
-
-        if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
-            frappe.throw("Unauthorized: Invalid webhook signature.")
-
-        data = json.loads(raw_request_body.decode("utf-8"))
-        shopify_customer_id = str(data.get("id"))
-
-        if not shopify_customer_id:
-            frappe.throw("Customer ID missing in webhook payload.")
-
-        customer_names = frappe.get_all("Customer", filters={"shopify_id": shopify_customer_id}, pluck="name")
-        if not customer_names:
-            return
-
-        customer_name = customer_names[0]
-        frappe.db.set_value("Customer", customer_name, "disabled", 1)
-        
-
-    except Exception:
-        frappe.log_error(frappe.get_traceback(), "Shopify Delete Webhook Error")
-        frappe.clear_messages()
-        frappe.response["http_status_code"] = 500
-        return "Error"
-
 
 
 @frappe.whitelist(allow_guest=True)

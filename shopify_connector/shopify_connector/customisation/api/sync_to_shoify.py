@@ -1,11 +1,13 @@
 import frappe
 import requests
-
+from frappe import _
+import json
 from frappe.utils.background_jobs import enqueue
 
 
 def validate_api_path():
     url = frappe.request.url
+    print(url, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     path = url.split("//")[1].split("/")[-1] if "//" in url else url.split("/", 1)[-1]
     endpoint_key = path.split("/")[0] if path else ""
     if endpoint_key != "frappe.desk.form.save.savedocs":
@@ -13,8 +15,7 @@ def validate_api_path():
     return True
 
 def enqueue_send_customer_to_shopify(doc, method):
-    if not getattr(doc.flags, "from_shopify", False):
-        enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
+    enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
 
 def send_customer_to_shopify_hook_delayed(doc,method):
     send_customer_to_shopify_hook(doc, "after_insert")
@@ -321,10 +322,11 @@ def get_current_domain_name() -> str:
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_item_to_shopify(doc, method):
+    print("1111111111111111111111111")
     from_desk = validate_api_path()
+    print("22222222222222",from_desk)
     if not from_desk:
         return
-    
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_product:
@@ -351,7 +353,7 @@ def send_item_to_shopify(doc, method):
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
-    SHOPIFY_API_VERSION = "2025-04"
+    SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
 
     product_shopify_id_to_update = parent_doc_for_payload.shopify_id
 
@@ -379,7 +381,6 @@ def send_item_to_shopify(doc, method):
             "options": [],
         }
     }
-    
 
     if image_url:
         product_payload["product"]["images"].append({"src": image_url})
@@ -515,15 +516,21 @@ def send_item_to_shopify(doc, method):
         return
 
     hsn_code = parent_doc_for_payload.gst_hsn_code or ""
+    stock_uom = parent_doc_for_payload.stock_uom or ""
     product_payload["product"]["metafields"] = [
         {
             "namespace": "custom",
             "key": "hsn",
             "value": str([int(hsn_code)]),
+            "type": "number_integer"
+        },
+        {
+            "namespace": "custom",
+            "key": "default_unit_of_measure",
+            "value": stock_uom,
+            "type": "single_line_text_field"
         }
     ]
-
-
     if product_shopify_id_to_update:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"
         response = requests.put(url, json=product_payload, verify=False)
@@ -531,6 +538,7 @@ def send_item_to_shopify(doc, method):
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
 
+    print(response.json())
     if response.status_code in [200, 201]:
         shopify_product = response.json()["product"]
         if frappe_template_item_name:
@@ -565,180 +573,241 @@ def send_item_to_shopify(doc, method):
         return
 
 
-
 ###################################################################################################
 
 
 
-def shopify_credentials():
-    doc=frappe.get_single("Shopify Connector Setting")
-    access_token = doc.access_token
-    url=doc.shop_url
-    version = doc.shopify_api_version
-    shopify_graph_url = f"https://{url}/admin/api/{version}/graphql.json"
-    return {"access_token":access_token,
-            "shopify_graph_url":shopify_graph_url}
 
-
-def create_shopify_draft_order(doc, method):
-   
-    shopify = frappe.get_single("Shopify Connector Setting")
-    if not shopify.enable_shopify:
+def sync_inventory_to_shopify(doc, method):
+    shopify_settings = frappe.get_single("Shopify Connector Setting")
+    if not shopify_settings:
+        frappe.log_error("Shopify Connector Setting not found", "Shopify Sync Error")
         return
 
+    shopify_url = shopify_settings.shop_url
+    api_key = shopify_settings.api_key
+    version = shopify_settings.shopify_api_version
+    password = shopify_settings.access_token
+    if not (shopify_url and api_key and password):
+        frappe.log_error("Shopify API credentials missing", "Shopify Sync Error")
+        return
+
+    warehouse = doc.warehouse
+    item_code = doc.item_code
+    qty = doc.actual_qty
+
+    shopify_location_id = None
+    for mapping in shopify_settings.warehouse_setting:
+        if mapping.erpnext_warehouse == warehouse:
+            shopify_location_id = mapping.shopify_id
+            break
+
+    if not shopify_location_id:
+        frappe.log_error(f"No Shopify location mapped for warehouse {warehouse}", "Shopify Sync Error")
+        return
+
+    item = frappe.get_doc("Item", item_code)
+    shopify_variant_id = item.get("custom_variant_id")
+    if not shopify_variant_id:
+        frappe.log_error(f"Shopify Variant ID not found for item {item_code}", "Shopify Sync Error")
+        return
+
+    url = f"https://{shopify_url}/admin/api/{version}/inventory_levels/set.json"
     headers = {
         "Content-Type": "application/json",
-        "X-Shopify-Access-Token": shopify_credentials().get("access_token")
+        "Authorization": f"Basic {password}"
+    }
+    payload = {
+        "location_id": shopify_location_id,
+        "inventory_item_id": shopify_variant_id,
+        "available": qty
     }
 
-    add= frappe.db.get_all("Dynamic Link", filters={"link_doctype": "Customer", "parenttype": "Address","link_name":doc.customer}, fields=["parent"])
-    address = frappe.get_doc("Address",add[0].parent)
-
-    customer = frappe.get_doc("Customer", doc.customer)
-    shopify_customer_id = customer.shopify_id
-    if not shopify_customer_id:
-        frappe.throw("Customer does not have a linked Shopify ID.")
-    contact= frappe.db.get_all("Dynamic Link", filters={"link_doctype": "Customer", "parenttype": "Contact","link_name":doc.customer}, fields=["parent"])
-    
-    customer_email = frappe.db.get_value("Contact", contact[0].parent, "email_id") if contact else None
-
-
-    line_items = []
-    for item in doc.items:
-        line_item = {}
-
-        items = frappe.get_doc("Item", item)
-
-        if items.custom_variant_id:
-            line_item["variantId"] = f"gid://shopify/ProductVariant/{items.custom_variant_id}"
+    try:
+        response = requests.post(url, headers=headers, data=payload)
+        if response.status_code == 200:
+            frappe.msgprint(_("Inventory synced successfully to Shopify for item {0} in warehouse {1}").format(item_code, warehouse))
         else:
-            line_item["title"] = item.item_name
-            line_item["originalUnitPrice"] = float(item.rate)
+            frappe.log_error(f"Failed to sync inventory to Shopify: {response.text}", "Shopify Sync Error")
+    except Exception as e:
+        frappe.log_error(f"Error syncing inventory to Shopify: {str(e)}", "Shopify Sync Error")
 
-        line_item["quantity"] = int(item.qty)
+def on_update(doc, method):
+    sync_inventory_to_shopify(doc, method)
 
-        if item.discount_amount:
-            line_item["appliedDiscount"] = {
-                "description": "Line item discount",
-                "value": float(item.discount_percentage or 0),
-                "amount": float(item.discount_amount),
-                "valueType": "FIXED_AMOUNT",
-                "title": "Item Discount"
-            }
+def after_insert(doc, method):
+    sync_inventory_to_shopify(doc, method)
+    
+    
+# def shopify_credentials():
+#     doc=frappe.get_single("Shopify Connector Setting")
+#     access_token = doc.access_token
+#     url=doc.shop_url
+#     version = doc.shopify_api_version
+#     shopify_graph_url = f"https://{url}/admin/api/{version}/graphql.json"
+#     return {"access_token":access_token,
+#             "shopify_graph_url":shopify_graph_url}
 
-        line_items.append(line_item)
+
+# def create_shopify_draft_order(doc, method):
+   
+#     shopify = frappe.get_single("Shopify Connector Setting")
+#     if not shopify.enable_shopify:
+#         return
+
+#     headers = {
+#         "Content-Type": "application/json",
+#         "X-Shopify-Access-Token": shopify_credentials().get("access_token")
+#     }
+
+#     add= frappe.db.get_all("Dynamic Link", filters={"link_doctype": "Customer", "parenttype": "Address","link_name":doc.customer}, fields=["parent"])
+#     address = frappe.get_doc("Address",add[0].parent)
+
+#     customer = frappe.get_doc("Customer", doc.customer)
+#     shopify_customer_id = customer.shopify_id
+#     if not shopify_customer_id:
+#         frappe.throw("Customer does not have a linked Shopify ID.")
+#     contact= frappe.db.get_all("Dynamic Link", filters={"link_doctype": "Customer", "parenttype": "Contact","link_name":doc.customer}, fields=["parent"])
+    
+#     customer_email = frappe.db.get_value("Contact", contact[0].parent, "email_id") if contact else None
+
+
+#     line_items = []
+#     for item in doc.items:
+#         line_item = {}
+
+#         items = frappe.get_doc("Item", item)
+
+#         if items.custom_variant_id:
+#             line_item["variantId"] = f"gid://shopify/ProductVariant/{items.custom_variant_id}"
+#         else:
+#             line_item["title"] = item.item_name
+#             line_item["originalUnitPrice"] = float(item.rate)
+
+#         line_item["quantity"] = int(item.qty)
+
+#         if item.discount_amount:
+#             line_item["appliedDiscount"] = {
+#                 "description": "Line item discount",
+#                 "value": float(item.discount_percentage or 0),
+#                 "amount": float(item.discount_amount),
+#                 "valueType": "FIXED_AMOUNT",
+#                 "title": "Item Discount"
+#             }
+
+#         line_items.append(line_item)
 
    
-    shipping_address = {
-        "address1": address.address_line1,
-        "address2": address.address_line2 or "",
-        "city": address.city ,
-        "province": address.state,
-        "country": address.country,
-        "zip": address.pincode
-    }
+#     shipping_address = {
+#         "address1": address.address_line1,
+#         "address2": address.address_line2 or "",
+#         "city": address.city ,
+#         "province": address.state,
+#         "country": address.country,
+#         "zip": address.pincode
+#     }
 
-    billing_address = {
-        "address1": address.address_line1 or "",
-        "address2": address.address_line2 or "",
-        "city": address.city ,
-        "province": address.state,
-        "country": address.country,
-        "zip": address.pincode
-    }
+#     billing_address = {
+#         "address1": address.address_line1 or "",
+#         "address2": address.address_line2 or "",
+#         "city": address.city ,
+#         "province": address.state,
+#         "country": address.country,
+#         "zip": address.pincode
+#     }
 
-    applied_discount = None
-    if doc.discount_amount or doc.additional_discount_percentage:
-        applied_discount = {
-            "description": "Order Discount",
-            "value": float(doc.additional_discount_percentage or 0),
-            "amount": float(doc.discount_amount or 0),
-            "valueType": "PERCENTAGE" if doc.additional_discount_percentage else "FIXED_AMOUNT",
-            "title": "ERP Discount"
-        }
+#     applied_discount = None
+#     if doc.discount_amount or doc.additional_discount_percentage:
+#         applied_discount = {
+#             "description": "Order Discount",
+#             "value": float(doc.additional_discount_percentage or 0),
+#             "amount": float(doc.discount_amount or 0),
+#             "valueType": "PERCENTAGE" if doc.additional_discount_percentage else "FIXED_AMOUNT",
+#             "title": "ERP Discount"
+#         }
 
   
-    query = """
-    mutation draftOrderCreate($input: DraftOrderInput!) {
-      draftOrderCreate(input: $input) {
-        draftOrder {
-          id
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-    """
+#     query = """
+#     mutation draftOrderCreate($input: DraftOrderInput!) {
+#       draftOrderCreate(input: $input) {
+#         draftOrder {
+#           id
+#         }
+#         userErrors {
+#           field
+#           message
+#         }
+#       }
+#     }
+#     """
 
-    variables = {
-        "input": {
-            "customerId": f"gid://shopify/Customer/{shopify_customer_id}",
-            "note": doc.po_no or "ERPNext Draft Order",
-            "email": customer_email,
-            "tags": [doc.status],
-            "taxExempt": False,
-            "shippingLine": {
-                "title": "Standard Shipping",
-                "price": float(0)
-            },
-            "shippingAddress": shipping_address,
-            "billingAddress": billing_address,
-            "lineItems": line_items
-        }
-    }
+#     variables = {
+#         "input": {
+#             "customerId": f"gid://shopify/Customer/{shopify_customer_id}",
+#             "note": doc.po_no or "ERPNext Draft Order",
+#             "email": customer_email,
+#             "tags": [doc.status],
+#             "taxExempt": False,
+#             "shippingLine": {
+#                 "title": "Standard Shipping",
+#                 "price": float(0)
+#             },
+#             "shippingAddress": shipping_address,
+#             "billingAddress": billing_address,
+#             "lineItems": line_items
+#         }
+#     }
 
-    if applied_discount:
-        variables["input"]["appliedDiscount"] = applied_discount
+#     if applied_discount:
+#         variables["input"]["appliedDiscount"] = applied_discount
 
-    response = requests.post(
-        shopify_credentials().get("shopify_graph_url"),
-        headers=headers,
-        json={"query": query, "variables": variables}
-    )
+#     response = requests.post(
+#         shopify_credentials().get("shopify_graph_url"),
+#         headers=headers,
+#         json={"query": query, "variables": variables}
+#     )
 
-    if response.status_code != 200 or "errors" in response.json():
-        frappe.log_error("Shopify Draft Order Creation Failed", response.text)
-        return
-    abc=response.json().get("data", {})
-    draft_order = response.json().get("data", {}).get("draftOrderCreate", {}).get("draftOrder")
-    if draft_order and draft_order.get("id"):
-        doc.custom_shopify_draft_order_id = draft_order["id"].split("/")[-1]
-        doc.flags.from_shopify = True
-        doc.save(ignore_permissions=True)
-        frappe.msgprint("Shopify draft order created successfully.")
-    else:
-        frappe.log_error(" Shopify Draft Order missing ID", response.text)
-        
-        
-        
-        
-# import pycountry
-# import unicodedata
-
-# def clean_name(name):
-#     return unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('utf-8').lower().strip()
-
-# def get_country_code(country_name):
-#     name_clean = clean_name(country_name)
-    
-#     for country in pycountry.countries:
-#         if clean_name(country.name) == name_clean:
-#             return country.alpha_2
-#     return None
-
-
-# def get_country_and_state_codes(country_name, state_name):
-#     country_code = get_country_code(country_name)
-#     if not country_code:
-#         return None, None
-
-#     state_clean = clean_name(state_name)
-
-#     for subdiv in pycountry.subdivisions.get(country_code=country_code):
-#         if state_clean in clean_name(subdiv.name):
-#             state_code = subdiv.code.split('-')[-1]  
-#             return country_code, state_code
+#     if response.status_code != 200 or "errors" in response.json():
+#         frappe.log_error("Shopify Draft Order Creation Failed", response.text)
+#         return
+#     abc=response.json().get("data", {})
+#     draft_order = response.json().get("data", {}).get("draftOrderCreate", {}).get("draftOrder")
+#     if draft_order and draft_order.get("id"):
+#         doc.custom_shopify_draft_order_id = draft_order["id"].split("/")[-1]
+#         doc.flags.from_shopify = True
+#         doc.save(ignore_permissions=True)
+#         frappe.msgprint("Shopify draft order created successfully.")
 #     else:
-#         return frappe.throw(f"{state_name} not found in {country_name}")
+#         frappe.log_error(" Shopify Draft Order missing ID", response.text)
+        
+        
+        
+        
+# # import pycountry
+# # import unicodedata
+
+# # def clean_name(name):
+# #     return unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('utf-8').lower().strip()
+
+# # def get_country_code(country_name):
+# #     name_clean = clean_name(country_name)
+    
+# #     for country in pycountry.countries:
+# #         if clean_name(country.name) == name_clean:
+# #             return country.alpha_2
+# #     return None
+
+
+# # def get_country_and_state_codes(country_name, state_name):
+# #     country_code = get_country_code(country_name)
+# #     if not country_code:
+# #         return None, None
+
+# #     state_clean = clean_name(state_name)
+
+# #     for subdiv in pycountry.subdivisions.get(country_code=country_code):
+# #         if state_clean in clean_name(subdiv.name):
+# #             state_code = subdiv.code.split('-')[-1]  
+# #             return country_code, state_code
+# #     else:
+# #         return frappe.throw(f"{state_name} not found in {country_name}")

@@ -146,6 +146,10 @@ doc_events = {
     },
     "Sales Order":{
         "after_insert":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_draft_order"
+    },
+    "Bin": {
+        "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.sync_inventory_to_shopify",
+        "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.sync_inventory_to_shopify"
     }
 }
 
