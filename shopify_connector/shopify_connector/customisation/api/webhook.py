@@ -1233,8 +1233,9 @@ def product_update():
                     variant = frappe.new_doc("Item")
                 else:
                     variant = frappe.new_doc("Item")
+                    
 
-            variant.item_code = v.get("title")
+            variant.item_code = f"{item.item_code}-{v.get('sku')}"
             variant.item_name = f"{product_data.get('title')}-{v.get('title')}"
             variant.item_group = item_group
             variant.variant_of = item.name
@@ -1284,6 +1285,8 @@ def product_update():
                     else:
                         variant.image = variant_image_url
                     variant.save()
+                    
+    item.flags.from_webhook = True
 
     frappe.log_error(title="Product Update", message="Completed")
     return "Product updated successfully."
@@ -1313,7 +1316,7 @@ def get_hsn_from_metafields(product_data, settings):
                     try:
                         hsn_code = json.loads(hsn_code)[0]
                     except (json.JSONDecodeError, IndexError, TypeError):
-                        frappe.throw("Invalid HSN code format from metafield")
+                        frappe.log_error("Invalid HSN code format from metafield")
                     if not frappe.db.exists("GST HSN Code", {"hsn_code": hsn_code}):
                         hs = frappe.new_doc("GST HSN Code")
                         hs.hsn_code = str(hsn_code)
@@ -1322,6 +1325,7 @@ def get_hsn_from_metafields(product_data, settings):
 
             elif metafield.get('key') == 'default_unit_of_measure':
                 metaobject_gid = metafield.get('value')
+                
 
     if hsn_code or label:
         return hsn_code, metaobject_gid

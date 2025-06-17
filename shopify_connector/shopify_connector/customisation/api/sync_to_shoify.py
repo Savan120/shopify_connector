@@ -9,7 +9,6 @@ def validate_api_path():
     url = frappe.request.url
     path = url.split("//")[1].split("/")[-1] if "//" in url else url.split("/", 1)[-1]
     endpoint_key = path.split("/")[0] if path else ""
-    print(endpoint_key)
     if endpoint_key in ["frappe.desk.form.save.savedocs", "frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs"]:
         return True
     return False
@@ -322,6 +321,8 @@ def get_current_domain_name() -> str:
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_item_to_shopify(doc, method):
+    if getattr(doc, "from_webhook", False):
+        return
     from_desk = validate_api_path()
     if not from_desk:
         return
