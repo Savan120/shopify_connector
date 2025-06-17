@@ -844,6 +844,221 @@ def product_creation():
 
 
 
+# @frappe.whitelist(allow_guest=True)
+# def product_update():
+#     frappe.local.flags.skip_shopify_webhook = True
+#     raw_request_body = frappe.local.request.get_data()
+#     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
+#     settings = frappe.get_single("Shopify Connector Setting")
+#     frappe.session.user = settings.webhook_session_user
+#     shopify_webhook_secret = settings.shopify_webhook_secret
+
+#     if not shopify_webhook_secret:
+#         frappe.throw(_("Webhook secret not configured."), frappe.ValidationError)
+
+#     secret_key_bytes = shopify_webhook_secret.encode("utf-8")
+#     calculated_hmac = base64.b64encode(hmac.new(secret_key_bytes, raw_request_body, hashlib.sha256).digest())
+
+#     if not hmac.compare_digest(calculated_hmac, shopify_hmac_header.encode("utf-8")):
+#         frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
+
+#     product_data = json.loads(raw_request_body.decode("utf-8"))
+#     product_id = product_data.get("id")
+#     options = product_data.get("options", [])
+#     item_group = product_data.get("product_type") or settings.item_group
+#     hsn_code_parent = get_hsn_from_metafields(product_data, settings)
+#     hsn_code, uom = hsn_code_parent
+
+#     if not frappe.db.exists("Item Group", {"name": item_group}):
+#         item_group_doc = frappe.new_doc("Item Group")
+#         item_group_doc.item_group_name = item_group
+#         item_group_doc.flags.ignore_permissions = True
+#         item_group_doc.insert()
+#         item_group_doc.save()
+
+#     variants = product_data.get("variants", [])
+#     images = product_data.get("images", [])
+#     is_default_title_only = len(options) == 1 and options[0].get("name") == "Title" and options[0].get("values") == ["Default Title"]
+#     item_doc_name = frappe.db.exists("Item", {"shopify_id": product_id})
+
+#     if not item_doc_name:
+#         item = frappe.new_doc("Item")
+#         item.shopify_id = product_id
+#         if variants:
+#             item.shopify_selling_rate = variants[0].get("price") or 0.0
+#         item.item_code = product_data.get("title")
+#         item.item_name = product_data.get("title")
+#         item.description = product_data.get("body_html")
+#         item.item_group = item_group
+#         item.gst_hsn_code = hsn_code
+#         item.stock_uom = uom
+#         item.custom_send_to_shopify = 1
+#         item.disabled = product_data.get("status") == "draft"
+#         item.flags.ignore_permissions = True
+#         item.insert(ignore_permissions=True)
+#     else:
+#         item = frappe.get_doc("Item", item_doc_name)
+
+#     if images:
+#         img_link = images[0].get("src")
+#         if img_link:
+#             file_doc_name = frappe.db.exists("File", {"file_url": img_link})
+#             if not file_doc_name:
+#                 file_doc = frappe.get_doc({
+#                     "doctype": "File",
+#                     "file_url": img_link,
+#                     "is_private": 0,
+#                     "attached_to_doctype": "Item",
+#                     "attached_to_name": item.name,
+#                     "attached_to_field": "image"
+#                 })
+#                 file_doc.insert(ignore_permissions=True)
+#             else:
+#                 item.image = img_link
+#     else:
+#         if item.image:
+#             file_doc_name = frappe.db.exists("File", {
+#                 "file_url": item.image,
+#                 "attached_to_doctype": "Item",
+#                 "attached_to_name": item.name
+#             })
+#             if file_doc_name:
+#                 frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
+#             item.image = None
+#             item.save()
+
+#     item.item_code = product_data.get("title")
+#     item.item_name = product_data.get("title")
+#     item.description = product_data.get("body_html")
+#     item.item_group = item_group
+#     item.stock_uom = uom
+#     item.gst_hsn_code = hsn_code
+#     item.shopify_id = product_id
+#     item.custom_send_to_shopify = 1
+#     item.disabled = product_data.get("status") == "draft"
+#     if variants:
+#         item.shopify_selling_rate = variants[0].get("price") or 0.0
+
+#     if is_default_title_only:
+#         item.has_variants = 0
+#         item.set("attributes", [])
+#         item.save()
+#         existing_variants = frappe.get_list("Item", filters={"variant_of": item.name})
+#         for v in existing_variants:
+#             try:
+#                 frappe.delete_doc("Item", v.name, ignore_permissions=True)
+#             except:
+#                 pass
+#     else:
+#         item.has_variants = 1
+#         new_attr_names = [opt["name"] for opt in options]
+#         existing_attr_names = [attr.attribute for attr in item.attributes]
+
+#         for opt in options:
+#             attr_name = opt["name"]
+#             if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
+#                 attr_doc = frappe.new_doc("Item Attribute")
+#                 attr_doc.attribute_name = attr_name
+#                 attr_doc.flags.ignore_permissions = True
+#             else:
+#                 attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
+
+#             existing_vals = frappe.get_all("Item Attribute Value", filters={"parent": attr_doc.name}, pluck="attribute_value")
+#             for val in opt["values"]:
+#                 if val not in existing_vals:
+#                     attr_doc.append("item_attribute_values", {"attribute_value": val, "abbr": val})
+
+#             attr_doc.flags.ignore_permissions = True
+#             attr_doc.save()
+
+#             if attr_name not in existing_attr_names:
+#                 item.append("attributes", {"attribute": attr_name})
+
+#         for existing_attr in existing_attr_names:
+#             if existing_attr not in new_attr_names:
+#                 variants = frappe.get_all("Item", filters={"variant_of": item.name}, pluck="name")
+#                 if not variants:
+#                     item.attributes = [attr for attr in item.attributes if attr.attribute != existing_attr]
+#         item.flags.ignore_permissions = True
+#         item.save()
+
+#         shopify_images_map = {img.get("id"): img.get("src") for img in images}
+
+#         for v in variants:
+#             variant_doc_name = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
+#             variant = None
+
+#             if variant_doc_name:
+                
+#                 variant = frappe.get_doc("Item", variant_doc_name)
+#             else:
+#                 existing_item_name = frappe.db.exists("Item", {"item_code": v.get("sku")})
+#                 if existing_item_name:
+#                     existing_variant = frappe.get_doc("Item", existing_item_name)
+#                     if existing_variant.variant_of and existing_variant.variant_of != item.name:
+#                         continue
+#                     if not existing_variant.variant_of:
+#                         frappe.delete_doc("Item", existing_item_name, ignore_permissions=True)
+#                     variant = frappe.new_doc("Item")
+#                 else:
+#                     variant = frappe.new_doc("Item")
+
+#             variant.item_code = v.get("title")
+#             variant.item_name = f"{product_data.get('title')}-{v.get('title')}"
+#             variant.item_group = item_group
+#             variant.variant_of = item.name
+#             variant.custom_send_to_shopify = True
+#             variant.stock_uom = uom
+#             variant.gst_hsn_code = hsn_code
+#             variant.shopify_selling_rate = v.get("price") or 0.0
+#             variant.custom_variant_id = v.get("id")
+#             variant.custom_inventory_item_id = v.get("inventory_item_id")
+#             variant.set("attributes", [])
+
+#             variant_options = [v.get("option1"), v.get("option2"), v.get("option3")]
+#             for i, val in enumerate(variant_options):
+#                 if val and i < len(options):
+#                     variant.append("attributes", {"attribute": options[i]["name"], "attribute_value": val})
+
+#             variant.flags.ignore_permissions = True
+#             variant.save()
+
+#             variant_image_id = v.get("image_id")
+#             variant_image_url = shopify_images_map.get(variant_image_id)
+#             if variant_image_id is None:
+#                 if variant.image:
+#                     file_doc_name = frappe.db.exists("File", {
+#                         "file_url": variant.image,
+#                         "attached_to_doctype": "Item",
+#                         "attached_to_name": variant.name
+#                     })
+#                     if file_doc_name:
+#                         frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
+#                     variant.image = None
+#                     variant.save()
+#             else:
+#                 if variant_image_url:
+#                     file_doc_name = frappe.db.exists("File", {"file_url": variant_image_url})
+#                     if not file_doc_name:
+#                         file_doc = frappe.get_doc({
+#                             "doctype": "File",
+#                             "file_url": variant_image_url,
+#                             "is_private": 0,
+#                             "attached_to_doctype": "Item",
+#                             "attached_to_name": variant.name,
+#                             "attached_to_field": "image"
+#                         })
+#                         file_doc.insert(ignore_permissions=True)
+#                         variant.image = file_doc.file_url
+#                     else:
+#                         variant.image = variant_image_url
+#                     variant.save()
+
+#     frappe.log_error(title="Product Update", message="Completed")
+#     return "Product updated successfully."
+
+
+
 @frappe.whitelist(allow_guest=True)
 def product_update():
     frappe.local.flags.skip_shopify_webhook = True
@@ -863,13 +1078,12 @@ def product_update():
         frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
 
     product_data = json.loads(raw_request_body.decode("utf-8"))
-    print(product_data)
     product_id = product_data.get("id")
     options = product_data.get("options", [])
     item_group = product_data.get("product_type") or settings.item_group
     hsn_code_parent = get_hsn_from_metafields(product_data, settings)
     hsn_code, uom = hsn_code_parent
-    
+
     if not frappe.db.exists("Item Group", {"name": item_group}):
         item_group_doc = frappe.new_doc("Item Group")
         item_group_doc.item_group_name = item_group
@@ -950,44 +1164,55 @@ def product_update():
                 frappe.delete_doc("Item", v.name, ignore_permissions=True)
             except:
                 pass
-    
     else:
         item.has_variants = 1
+        new_attr_data = {opt["name"]: sorted(opt["values"]) for opt in options}
+        existing_attr_data = {attr.attribute: sorted(frappe.get_all("Item Attribute Value", 
+            filters={"parent": attr.attribute}, pluck="attribute_value")) for attr in item.attributes}
 
-        new_attr_names = [opt["name"] for opt in options]
+        if new_attr_data == existing_attr_data:
+            frappe.log_error(title="Product Update", message=f"No changes in attributes for {item.name}")
+        else:
+            stock_exists = frappe.db.exists("Stock Ledger Entry", {"item_code": item.name})
+            if stock_exists:
+                frappe.log_error(title="Product Update Skipped", 
+                    message=f"Cannot update attributes for {item.name} due to existing stock transactions.")
+                return "Product update skipped due to existing stock transactions."
 
-        existing_attr_names = [attr.attribute for attr in item.attributes]
+            new_attr_names = list(new_attr_data.keys())
+            existing_attr_names = list(existing_attr_data.keys())
 
-        for opt in options:
-            attr_name = opt["name"]
-
-            if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
-                attr_doc = frappe.new_doc("Item Attribute")
-                attr_doc.attribute_name = attr_name
-                attr_doc.flags.ignore_permissions = True
-            else:
-                attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
-
-            existing_vals = frappe.get_all("Item Attribute Value", filters={"parent": attr_doc.name}, pluck="attribute_value")
-            for val in opt["values"]:
-                if val not in existing_vals:
-                    attr_doc.append("item_attribute_values", {"attribute_value": val, "abbr": val})
-
-            attr_doc.flags.ignore_permissions = True
-            attr_doc.save()
-
-            if attr_name not in existing_attr_names:
-                item.append("attributes", {"attribute": attr_name})
-
-        for existing_attr in existing_attr_names:
-            if existing_attr not in new_attr_names:
-                variants = frappe.get_all("Item", filters={"variant_of": item.name}, pluck="name")
-                if variants:
-                    frappe.msgprint(f"Attribute '{existing_attr}' exists in variants and can't be removed from the template.")
+            for opt in options:
+                attr_name = opt["name"]
+                if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
+                    attr_doc = frappe.new_doc("Item Attribute")
+                    attr_doc.attribute_name = attr_name
+                    attr_doc.flags.ignore_permissions = True
                 else:
-                    item.attributes = [attr for attr in item.attributes if attr.attribute != existing_attr]
-        item.flags.ignore_permissions = True
-        item.save()
+                    attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
+
+                existing_vals = frappe.get_all("Item Attribute Value", filters={"parent": attr_doc.name}, fields=["attribute_value", "abbr"])
+                existing_abbrs = {str(v["abbr"]).strip().lower() for v in existing_vals}
+                existing_attr_vals = {str(v["attribute_value"]).strip().lower() for v in existing_vals}
+
+                for val in opt["values"]:
+                    normalized_val = str(val).strip().lower()
+                    if normalized_val not in existing_attr_vals and normalized_val not in existing_abbrs:
+                        attr_doc.append("item_attribute_values", {"attribute_value": val.strip(), "abbr": val.strip()})
+
+                attr_doc.flags.ignore_permissions = True
+                attr_doc.save()
+                if attr_name not in existing_attr_names:
+                    item.append("attributes", {"attribute": attr_name})
+
+            for existing_attr in existing_attr_names:
+                if existing_attr not in new_attr_names:
+                    variants = frappe.get_all("Item", filters={"variant_of": item.name}, pluck="name")
+                    if not variants:
+                        item.attributes = [attr for attr in item.attributes if attr.attribute != existing_attr]
+
+            item.flags.ignore_permissions = True
+            item.save()
 
         shopify_images_map = {img.get("id"): img.get("src") for img in images}
 
@@ -1009,9 +1234,7 @@ def product_update():
                 else:
                     variant = frappe.new_doc("Item")
 
-            if not variant:
-                continue
-            variant.item_code = v.get('title')
+            variant.item_code = v.get("title")
             variant.item_name = f"{product_data.get('title')}-{v.get('title')}"
             variant.item_group = item_group
             variant.variant_of = item.name
@@ -1028,10 +1251,8 @@ def product_update():
                 if val and i < len(options):
                     variant.append("attributes", {"attribute": options[i]["name"], "attribute_value": val})
 
-            
             variant.flags.ignore_permissions = True
             variant.save()
-            
 
             variant_image_id = v.get("image_id")
             variant_image_url = shopify_images_map.get(variant_image_id)
@@ -1079,7 +1300,6 @@ def get_hsn_from_metafields(product_data, settings):
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     
-    frappe.log_error(title="HSN Response Check",message=response.json())
 
     metafields = response.json().get('metafields', [])
     hsn_code = None

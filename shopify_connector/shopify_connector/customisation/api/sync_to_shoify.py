@@ -7,12 +7,12 @@ from frappe.utils.background_jobs import enqueue
 
 def validate_api_path():
     url = frappe.request.url
-    print(url, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
     path = url.split("//")[1].split("/")[-1] if "//" in url else url.split("/", 1)[-1]
     endpoint_key = path.split("/")[0] if path else ""
-    if endpoint_key != "frappe.desk.form.save.savedocs":
-        return False
-    return True
+    print(endpoint_key)
+    if endpoint_key in ["frappe.desk.form.save.savedocs", "frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs"]:
+        return True
+    return False
 
 def enqueue_send_customer_to_shopify(doc, method):
     enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
@@ -322,11 +322,10 @@ def get_current_domain_name() -> str:
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 def send_item_to_shopify(doc, method):
-    print("1111111111111111111111111")
     from_desk = validate_api_path()
-    print("22222222222222",from_desk)
     if not from_desk:
         return
+
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_product:
@@ -522,6 +521,7 @@ def send_item_to_shopify(doc, method):
             "namespace": "custom",
             "key": "hsn",
             "value": str([int(hsn_code)]),
+            # "value": int(hsn_code),
             "type": "number_integer"
         },
         {
@@ -566,8 +566,6 @@ def send_item_to_shopify(doc, method):
                         })
                     except Exception as e:
                         frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku} (Frappe item: {frappe_variant_item_name}): {str(e)}", "Shopify Sync")
-        doc.flags.from_shopify = True
-        frappe.db.commit()
     else:
         frappe.log_error(title=f"Failed to sync product {parent_doc_for_payload.name} to Shopify", message= f"Status {response.status_code} - {response.text}")
         return
@@ -578,65 +576,65 @@ def send_item_to_shopify(doc, method):
 
 
 
-def sync_inventory_to_shopify(doc, method):
-    shopify_settings = frappe.get_single("Shopify Connector Setting")
-    if not shopify_settings:
-        frappe.log_error("Shopify Connector Setting not found", "Shopify Sync Error")
-        return
+# def sync_inventory_to_shopify(doc, method):
+#     shopify_settings = frappe.get_single("Shopify Connector Setting")
+#     if not shopify_settings:
+#         frappe.log_error("Shopify Connector Setting not found", "Shopify Sync Error")
+#         return
 
-    shopify_url = shopify_settings.shop_url
-    api_key = shopify_settings.api_key
-    version = shopify_settings.shopify_api_version
-    password = shopify_settings.access_token
-    if not (shopify_url and api_key and password):
-        frappe.log_error("Shopify API credentials missing", "Shopify Sync Error")
-        return
+#     shopify_url = shopify_settings.shop_url
+#     api_key = shopify_settings.api_key
+#     version = shopify_settings.shopify_api_version
+#     password = shopify_settings.access_token
+#     if not (shopify_url and api_key and password):
+#         frappe.log_error("Shopify API credentials missing", "Shopify Sync Error")
+#         return
 
-    warehouse = doc.warehouse
-    item_code = doc.item_code
-    qty = doc.actual_qty
+#     warehouse = doc.warehouse
+#     item_code = doc.item_code
+#     qty = doc.actual_qty
 
-    shopify_location_id = None
-    for mapping in shopify_settings.warehouse_setting:
-        if mapping.erpnext_warehouse == warehouse:
-            shopify_location_id = mapping.shopify_id
-            break
+#     shopify_location_id = None
+#     for mapping in shopify_settings.warehouse_setting:
+#         if mapping.erpnext_warehouse == warehouse:
+#             shopify_location_id = mapping.shopify_id
+#             break
 
-    if not shopify_location_id:
-        frappe.log_error(f"No Shopify location mapped for warehouse {warehouse}", "Shopify Sync Error")
-        return
+#     if not shopify_location_id:
+#         frappe.log_error(f"No Shopify location mapped for warehouse {warehouse}", "Shopify Sync Error")
+#         return
 
-    item = frappe.get_doc("Item", item_code)
-    shopify_variant_id = item.get("custom_variant_id")
-    if not shopify_variant_id:
-        frappe.log_error(f"Shopify Variant ID not found for item {item_code}", "Shopify Sync Error")
-        return
+#     item = frappe.get_doc("Item", item_code)
+#     shopify_variant_id = item.get("custom_variant_id")
+#     if not shopify_variant_id:
+#         frappe.log_error(f"Shopify Variant ID not found for item {item_code}", "Shopify Sync Error")
+#         return
 
-    url = f"https://{shopify_url}/admin/api/{version}/inventory_levels/set.json"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Basic {password}"
-    }
-    payload = {
-        "location_id": shopify_location_id,
-        "inventory_item_id": shopify_variant_id,
-        "available": qty
-    }
+#     url = f"https://{shopify_url}/admin/api/{version}/inventory_levels/set.json"
+#     headers = {
+#         "Content-Type": "application/json",
+#         "Authorization": f"Basic {password}"
+#     }
+#     payload = {
+#         "location_id": shopify_location_id,
+#         "inventory_item_id": shopify_variant_id,
+#         "available": qty
+#     }
 
-    try:
-        response = requests.post(url, headers=headers, data=payload)
-        if response.status_code == 200:
-            frappe.msgprint(_("Inventory synced successfully to Shopify for item {0} in warehouse {1}").format(item_code, warehouse))
-        else:
-            frappe.log_error(f"Failed to sync inventory to Shopify: {response.text}", "Shopify Sync Error")
-    except Exception as e:
-        frappe.log_error(f"Error syncing inventory to Shopify: {str(e)}", "Shopify Sync Error")
+#     try:
+#         response = requests.post(url, headers=headers, data=payload)
+#         if response.status_code == 200:
+#             frappe.msgprint(_("Inventory synced successfully to Shopify for item {0} in warehouse {1}").format(item_code, warehouse))
+#         else:
+#             frappe.log_error(f"Failed to sync inventory to Shopify: {response.text}", "Shopify Sync Error")
+#     except Exception as e:
+#         frappe.log_error(f"Error syncing inventory to Shopify: {str(e)}", "Shopify Sync Error")
 
-def on_update(doc, method):
-    sync_inventory_to_shopify(doc, method)
+# def on_update(doc, method):
+#     sync_inventory_to_shopify(doc, method)
 
-def after_insert(doc, method):
-    sync_inventory_to_shopify(doc, method)
+# def after_insert(doc, method):
+#     sync_inventory_to_shopify(doc, method)
     
     
 # def shopify_credentials():
