@@ -788,7 +788,6 @@ def product_creation():
         image_map = {img.get("id"): img.get("src") for img in images}
 
         if item.has_variants:
-            print(">>>>>>>>>>>>>>>>>>>>>>>>>>",item.name)
             for v in order_data.get("variants", []):
                 variant = frappe.new_doc("Item")
                 variant.item_code = v.get("sku")
@@ -1061,7 +1060,7 @@ def product_creation():
 
 @frappe.whitelist(allow_guest=True)
 def product_update():
-    frappe.local.flags.skip_shopify_webhook = True
+    print("Webhoooooooooooooooookkkkkkkkk", frappe.request.url)
     raw_request_body = frappe.local.request.get_data()
     shopify_hmac_header = frappe.local.request.headers.get("X-Shopify-Hmac-Sha256")
     settings = frappe.get_single("Shopify Connector Setting")
@@ -1223,18 +1222,11 @@ def product_update():
 
 
             if variant_doc_name:
-                print("variant_doc_name,",variant_doc_name)
                 variant = frappe.get_doc("Item", variant_doc_name)
             else:
                 existing_item_name = frappe.db.exists("Item", {"item_code": v.get("sku")})
-                print("existing_item_name",existing_item_name)
                 if existing_item_name:
                     variant = frappe.get_doc("Item", existing_item_name)
-                    # if existing_variant.variant_of and existing_variant.variant_of != item.name:
-                    #     continue
-                    # if not existing_variant.variant_of:
-                    #     frappe.delete_doc("Item", existing_item_name, ignore_permissions=True)
-                    # variant = frappe.new_doc("Item")
                 else:
                     variant = frappe.new_doc("Item")
                     
@@ -1258,21 +1250,20 @@ def product_update():
                     variant.append("attributes", {"attribute": options[i]["name"], "attribute_value": val})
 
             variant.flags.ignore_permissions = True
-            print(variant.__dict__,"|||||||||||||||||||")
             variant.save()
             variant_image_id = v.get("image_id")
             variant_image_url = shopify_images_map.get(variant_image_id)
             if variant_image_id is None:
                 if variant.image:
-                    file_doc_name = frappe.db.exists("File", {
+                    files = frappe.get_all("File", {
                         "file_url": variant.image,
                         "attached_to_doctype": "Item",
                         "attached_to_name": variant.name
-                    })
-                    if file_doc_name:
-                        frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
-                    variant.image = None
-                    variant.save()
+                    }, pluck="name")
+                    for file_name in files:
+                        frappe.delete_doc("File", file_name, ignore_permissions=True)
+                variant.image = None
+                variant.save()
             else:
                 if variant_image_url:
                     file_doc_name = frappe.db.exists("File", {"file_url": variant_image_url})
@@ -1330,7 +1321,7 @@ def get_hsn_from_metafields(product_data, settings):
             elif metafield.get('key') == 'default_unit_of_measure':
                 metaobject_gid = metafield.get('value')
                 
-
+                
     if hsn_code or metaobject_gid:
         return hsn_code, metaobject_gid
 
