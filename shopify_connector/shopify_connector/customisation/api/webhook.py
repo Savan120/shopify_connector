@@ -1002,7 +1002,6 @@ def product_update():
 
         shopify_images_map = {img.get("id"): img.get("src") for img in images}
         
-        print(shopify_images_map)
 
         for v in variants:
             variant_doc_name = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
@@ -1043,7 +1042,6 @@ def product_update():
             variant.flags.ignore_permissions = True
             variant.save()
             variant_image_id = v.get("image_id")
-            print(variant_image_id)
             variant_image_url = shopify_images_map.get(variant_image_id)
             if variant_image_id is None:
                 if variant.image:

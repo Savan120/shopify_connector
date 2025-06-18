@@ -478,8 +478,14 @@ def send_item_to_shopify(doc, method):
 
             variants_to_send_to_shopify.append(variant_data)
             
+            print(variant_doc.image)
+            
+            
             if variant_doc.image and variant_doc.custom_variant_id:
-                variant_image_url = site_url + variant_doc.image
+                if variant_doc.image.startswith("https://"):
+                    variant_image_url = variant_doc.image
+                else:
+                    variant_image_url = site_url + variant_doc.image
 
                 image_payload = {
                     "src": variant_image_url,
@@ -492,7 +498,8 @@ def send_item_to_shopify(doc, method):
                     images_to_send_to_shopify.append(image_payload)
                     
                     
-                print(image_payload, images_to_send_to_shopify)
+                print(images_to_send_to_shopify)
+                print("\n\n\n\n",variant_image_url)
                     
 
                         
