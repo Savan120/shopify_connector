@@ -9,7 +9,6 @@ def validate_api_path():
     url = frappe.request.url
     path = url.split("//")[1].split("/")[-1] if "//" in url else url.split("/", 1)[-1]
     endpoint_key = path.split("/")[0] if path else ""
-    # print(endpoint_key,"1111111111111111111111111111")
     if endpoint_key in ["frappe.desk.form.save.savedocs", "frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs"]:
         return True
     return False
@@ -419,68 +418,6 @@ def send_item_to_shopify(doc, method):
         variants_to_send_to_shopify = []
         images_to_send_to_shopify = []
         position_counter = 1
-        # for variant_frappe in all_variant_items_from_frappe:
-        #     if not variant_frappe.get("custom_send_to_shopify"):
-        #         continue
-
-        #     variant_doc = frappe.get_doc("Item", variant_frappe["name"])
-
-        #     variant_image_pairs = set()
-
-        #     variants = frappe.get_all(
-        #         "Item",
-        #         filters={
-        #             "variant_of": variant_doc.variant_of,
-        #             "image": ["!=", ""]
-        #         },
-        #         fields=["custom_variant_id", "image"]
-        #     )
-
-        #     for variant in variants:
-        #         if variant.custom_variant_id and variant.image:
-        #             variant_image_url = site_url + variant.image
-        #             variant_image_pairs.add((variant_image_url, variant.custom_variant_id))
-
-        #     for image_url, variant_id in variant_image_pairs:
-        #         image_data = {"src": image_url, "variant_ids": [variant_id]}
-        #         if image_data not in images_to_send_to_shopify and image_data not in product_payload["product"]["images"]:
-        #             images_to_send_to_shopify.append(image_data)
-
-        #     print("Images to send:", images_to_send_to_shopify)
-
-        #     attributes = frappe.get_all(
-        #         "Item Variant Attribute",
-        #         filters={"parent": variant_doc.name},
-        #         fields=["attribute", "attribute_value"]
-        #     )
-        #     attr_dict = {attr.attribute: attr.attribute_value for attr in attributes}
-
-        #     for attr in attribute_order:
-        #         if attr in attr_dict:
-        #             option_map[attr].add(attr_dict[attr])
-
-        #     values = [attr_dict.get(attr) for attr in attribute_order]
-        #     values += [None] * (3 - len(values))
-
-        #     variant_data = {
-        #         "option1": values[0],
-        #         "option2": values[1],
-        #         "option3": values[2],
-        #         "price": variant_doc.shopify_selling_rate or 0.0,
-        #         "sku": variant_doc.item_code,
-        #         "inventory_policy": "deny",
-        #         "taxable": True,
-        #         "position": position_counter,
-        #     }
-        #     position_counter += 1
-
-        #     if variant_frappe.get("custom_variant_id"):
-        #         variant_data["id"] = variant_frappe["custom_variant_id"]
-        #     elif variant_frappe["item_code"] in existing_shopify_variants_map:
-        #         variant_data["id"] = existing_shopify_variants_map[variant_frappe["item_code"]]["id"]
-        #         frappe.db.set_value("Item", variant_frappe["name"], "custom_variant_id", variant_data["id"])
-
-        #     variants_to_send_to_shopify.append(variant_data)
 
         for variant_frappe in all_variant_items_from_frappe:
             if not variant_frappe.get("custom_send_to_shopify"):
@@ -505,7 +442,6 @@ def send_item_to_shopify(doc, method):
 
             variant_ids = list(variant_ids)
 
-            print("Variant IDs:", variant_ids)
                                 
             attributes = frappe.get_all(
                 "Item Variant Attribute",
@@ -543,7 +479,6 @@ def send_item_to_shopify(doc, method):
             
             if variant_doc.image and variant_doc.custom_variant_id:
                 variant_image_url = site_url + variant_doc.image
-                print(variant_image_url, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
                 image_payload = {
                     "src": variant_image_url,
@@ -631,7 +566,6 @@ def send_item_to_shopify(doc, method):
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
 
-    print(response.json())
     if response.status_code in [200, 201]:
         shopify_product = response.json()["product"]
         if frappe_template_item_name:
