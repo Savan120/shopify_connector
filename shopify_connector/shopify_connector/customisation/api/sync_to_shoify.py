@@ -327,7 +327,7 @@ def send_item_to_shopify(doc, method):
 
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
-    if not shopify_keys.sync_product:
+    if not shopify_keys.sync_product and not doc.custom_send_to_shopify:
         return
 
     item_triggering_sync = frappe.get_doc("Item", doc.name)

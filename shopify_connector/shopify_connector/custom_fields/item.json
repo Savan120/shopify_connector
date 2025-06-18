@@ -16,8 +16,7 @@
    "insert_after": "shopify_id",
    "is_system_generated": 1,
    "label": "Inventory Item Id",
-   "module": "Shopify Connector",
-   "read_only": 1
+   "module": "Shopify Connector"
   },
   {
    "allow_on_submit": 1,
@@ -182,8 +181,7 @@
    "fieldtype": "Data",
    "is_system_generated": 1,
    "label": "Shopify ID",
-   "module": "Shopify Connector",
-   "read_only": 1
+   "module": "Shopify Connector"
   },
   {
    "dt": "Item",
