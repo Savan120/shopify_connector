@@ -9,12 +9,54 @@
   },
   {
    "dt": "Item",
-   "fieldname": "custom_send_to_shopify",
+   "fieldname": "custom_ignore_product_update",
    "fieldtype": "Check",
-   "insert_after": "has_variants",
+   "insert_after": "custom_variant_id",
    "is_system_generated": 1,
-   "label": "Send to Shopify",
+   "label": "Ignore Product Update",
    "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_variant_id",
+   "fieldtype": "Data",
+   "insert_after": "custom_inventory_item_id",
+   "is_system_generated": 1,
+   "label": "variant id",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_inventory_item_id",
+   "fieldtype": "Data",
+   "insert_after": "shopify_id",
+   "is_system_generated": 1,
+   "label": "inventory item id",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Item",
+   "fieldname": "is_ineligible_for_itc",
+   "fieldtype": "Check",
+   "insert_after": "item_tax_section_break",
+   "is_system_generated": 1,
+   "label": "Is Ineligible for Input Tax Credit",
+   "module": "Shopify Connector"
+  },
+  {
+   "description": "You can search code by the description of the category.",
+   "dt": "Item",
+   "fetch_from": "item_group.gst_hsn_code",
+   "fetch_if_empty": 1,
+   "fieldname": "gst_hsn_code",
+   "fieldtype": "Link",
+   "insert_after": "item_group",
+   "is_system_generated": 1,
+   "label": "HSN/SAC",
+   "mandatory_depends_on": "eval:gst_settings.validate_hsn_code && doc.is_sales_item",
+   "module": "Shopify Connector",
+   "options": "GST HSN Code"
   },
   {
    "dt": "Item",
@@ -35,46 +77,131 @@
    "read_only": 1
   },
   {
-   "description": "You can search code by the description of the category.",
    "dt": "Item",
-   "fetch_from": "item_group.gst_hsn_code",
-   "fetch_if_empty": 1,
-   "fieldname": "gst_hsn_code",
-   "fieldtype": "Link",
-   "insert_after": "item_group",
-   "is_system_generated": 1,
-   "label": "HSN/SAC",
-   "mandatory_depends_on": "eval:gst_settings.validate_hsn_code && doc.is_sales_item",
-   "module": "Shopify Connector",
-   "options": "GST HSN Code"
-  },
-  {
-   "dt": "Item",
-   "fieldname": "is_ineligible_for_itc",
+   "fieldname": "custom_send_to_shopify",
    "fieldtype": "Check",
-   "insert_after": "item_tax_section_break",
+   "insert_after": "has_variants",
    "is_system_generated": 1,
-   "label": "Is Ineligible for Input Tax Credit",
+   "label": "Send to Shopify",
    "module": "Shopify Connector"
   },
   {
    "dt": "Item",
-   "fieldname": "custom_inventory_item_id",
-   "fieldtype": "Data",
-   "insert_after": "shopify_id",
+   "fieldname": "show_in_mobile",
+   "fieldtype": "Check",
+   "insert_after": "disabled",
    "is_system_generated": 1,
-   "label": "inventory item id",
+   "label": "Show in Mobile",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "is_nil_exempt",
+   "fieldtype": "Check",
+   "insert_after": "is_non_gst",
+   "is_system_generated": 1,
+   "label": "Is Nil Exempt",
    "module": "Shopify Connector",
    "read_only": 1
   },
   {
    "dt": "Item",
-   "fieldname": "custom_variant_id",
-   "fieldtype": "Data",
-   "insert_after": "custom_inventory_item_id",
+   "fieldname": "is_non_gst",
+   "fieldtype": "Check",
+   "insert_after": "taxes",
    "is_system_generated": 1,
-   "label": "variant id",
+   "label": "Is Non GST",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "ACTION PENDING",
+   "dt": "Item",
+   "fieldname": "custom_website_status",
+   "fieldtype": "Select",
+   "insert_after": "stock_uom",
+   "label": "WEBSITE STATUS",
+   "module": "Shopify Connector",
+   "options": "ACTION PENDING\nOLD STOCK\nOUT STOCK\nLIVE WEBSITE\nNOT PUBLIC\nPENDING PHOTO",
+   "reqd": 1
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_syns_item_website",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "insert_after": "sync_with_unicommerce",
+   "label": "Syns Item Website",
    "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "unicommerce_batch_group_code",
+   "fieldtype": "Data",
+   "insert_after": "unicommerce_item_height",
+   "is_system_generated": 1,
+   "label": "Batch Group Code",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "unicommerce_item_height",
+   "fieldtype": "Int",
+   "insert_after": "unicommerce_item_width",
+   "is_system_generated": 1,
+   "label": "Height (mm) (Unicommerce)",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "unicommerce_item_width",
+   "fieldtype": "Int",
+   "insert_after": "unicommerce_item_length",
+   "is_system_generated": 1,
+   "label": "Width (mm) (Unicommerce)",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "unicommerce_item_length",
+   "fieldtype": "Int",
+   "insert_after": "over_billing_allowance",
+   "is_system_generated": 1,
+   "label": "Length (mm) (Unicommerce)",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "sync_with_unicommerce",
+   "fieldtype": "Check",
+   "insert_after": "item_code",
+   "is_system_generated": 1,
+   "label": "Sync Item with Unicommerce",
+   "module": "Shopify Connector"
+  },
+  {
+   "default": "0",
+   "depends_on": "published_in_website",
+   "dt": "Item",
+   "fieldname": "published_in_website",
+   "fieldtype": "Check",
+   "insert_after": "default_manufacturer_part_no",
+   "is_system_generated": 1,
+   "label": "Published In Website",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Item",
+   "fieldname": "custom_style_no",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "insert_after": "item_name",
+   "label": "Style No",
+   "module": "Shopify Connector",
+   "options": "STYLE NO"
   }
  ]
 }
