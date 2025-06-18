@@ -495,12 +495,7 @@ def send_item_to_shopify(doc, method):
                 existing_srcs = [img.get("src") for img in images_to_send_to_shopify]
                 existing_payload_srcs = [img.get("src") for img in product_payload["product"].get("images", [])]
                 if variant_image_url not in existing_srcs and variant_image_url not in existing_payload_srcs:
-                    images_to_send_to_shopify.append(image_payload)
-                    
-                    
-                print(images_to_send_to_shopify)
-                print("\n\n\n\n",variant_image_url)
-                    
+                    images_to_send_to_shopify.append(image_payload)    
 
                         
         product_payload["product"]["images"].extend(images_to_send_to_shopify)
