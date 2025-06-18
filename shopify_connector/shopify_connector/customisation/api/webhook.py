@@ -861,7 +861,6 @@ def product_update():
         frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
 
     product_data = json.loads(raw_request_body.decode("utf-8"))
-    print("\n\n\n\n\n",product_data,"\n\n\n\n\n")
     product_id = product_data.get("id")
     options = product_data.get("options", [])
     item_group = product_data.get("product_type") or settings.item_group
@@ -917,17 +916,16 @@ def product_update():
             else:
                 item.image = img_link
     else:
-        pass
-        # if item.image:
-        #     file_doc_name = frappe.db.exists("File", {
-        #         "file_url": item.image,
-        #         "attached_to_doctype": "Item",
-        #         "attached_to_name": item.name
-        #     })
-        #     if file_doc_name:
-        #         frappe.delete_doc("File", file_doc_name, ignore_permissions=True)
-        #     item.image = None
-        #     item.save()
+        if item.image:
+            files = frappe.get_all("File", {
+                "file_url": item.image,
+                "attached_to_doctype": "Item",
+                "attached_to_name": item.name
+            }, pluck="name")
+            for file_name in files:
+                frappe.delete_doc("File", file_name, ignore_permissions=True)
+            item.image = None
+            item.save()
 
     item.item_code = product_data.get("title")
     item.item_name = product_data.get("title")
@@ -1001,78 +999,6 @@ def product_update():
             item.flags.ignore_permissions = True
             item.save()
         
-        # if item.has_variants == 1:
-        #     new_attr_data = {opt["name"]: sorted(opt["values"]) for opt in options}
-        #     existing_attr_data = {
-        #         attr.attribute: sorted(
-        #             frappe.get_all(
-        #                 "Item Attribute Value",
-        #                 filters={"parent": attr.attribute},
-        #                 pluck="attribute_value"
-        #             )
-        #         ) for attr in item.attributes
-        #     }
-
-        #     if new_attr_data == existing_attr_data:
-        #         frappe.log_error(
-        #             title="Product Update",
-        #             message=f"No changes in attributes for {item.name}"
-        #         )
-        #         return "No changes in attributes."
-
-        #     stock_exists = frappe.db.exists("Stock Ledger Entry", {"item_code": item.name})
-        #     variant = frappe.get_all("Item", filters={"variant_of": item.name}, pluck="name")
-        #     variant_stock_exists = any(
-        #         frappe.db.exists("Stock Ledger Entry", {"item_code": variant}) for variant in variant
-        #     )
-
-        #     if stock_exists or variant_stock_exists:
-        #         frappe.log_error(
-        #             title="Product Update Skipped",
-        #             message=f"Cannot update attributes for {item.name} or its variant due to existing stock transactions."
-        #         )
-        #         return 
-
-        #     new_attr_names = list(new_attr_data.keys())
-        #     existing_attr_names = list(existing_attr_data.keys())
-
-        #     for opt in options:
-        #         attr_name = opt["name"]
-        #         if not frappe.db.exists("Item Attribute", {"attribute_name": attr_name}):
-        #             attr_doc = frappe.new_doc("Item Attribute")
-        #             attr_doc.attribute_name = attr_name
-        #             attr_doc.flags.ignore_permissions = True
-        #         else:
-        #             attr_doc = frappe.get_doc("Item Attribute", {"attribute_name": attr_name})
-
-        #         existing_vals = frappe.get_all(
-        #             "Item Attribute Value",
-        #             filters={"parent": attr_doc.name},
-        #             fields=["attribute_value", "abbr"]
-        #         )
-        #         existing_abbrs = {str(v["abbr"]).strip().lower() for v in existing_vals}
-        #         existing_attr_vals = {str(v["attribute_value"]).strip().lower() for v in existing_vals}
-
-        #         for val in opt["values"]:
-        #             normalized_val = str(val).strip().lower()
-        #             if normalized_val not in existing_attr_vals and normalized_val not in existing_abbrs:
-        #                 attr_doc.append(
-        #                     "item_attribute_values",
-        #                     {"attribute_value": val.strip(), "abbr": val.strip()}
-        #                 )
-
-        #         attr_doc.flags.ignore_permissions = True
-        #         attr_doc.save()
-
-        #         if attr_name not in existing_attr_names:
-        #             item.append("attributes", {"attribute": attr_name})
-
-        #     for existing_attr in existing_attr_names:
-        #         if existing_attr not in new_attr_names and not variant:
-        #             item.attributes = [attr for attr in item.attributes if attr.attribute != existing_attr]
-
-        #     item.flags.ignore_permissions = True
-        #     item.save()
 
         shopify_images_map = {img.get("id"): img.get("src") for img in images}
         
