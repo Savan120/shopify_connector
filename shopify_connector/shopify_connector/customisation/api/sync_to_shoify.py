@@ -537,8 +537,8 @@ def send_item_to_shopify(doc, method):
 
         product_payload["product"]["variants"].append(variant_data)
 
-        if image_url:
-            product_payload["product"]["images"].append({"src": image_url})
+        # if image_url:
+        #     product_payload["product"]["images"].append({"src": image_url})
 
     if parent_doc_for_payload.has_variants and not product_payload["product"]["variants"]:
         return

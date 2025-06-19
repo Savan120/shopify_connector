@@ -449,7 +449,6 @@ def customer_creation():
         }
 
         url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/customers.json"
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>",url)
         response = requests.get(url, headers=headers, verify=False)
         if response.status_code != 200:
             frappe.throw(f"Failed to fetch product data: {response.text}")
