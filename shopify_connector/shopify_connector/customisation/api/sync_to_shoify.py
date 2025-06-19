@@ -372,7 +372,7 @@ def send_item_to_shopify(doc, method):
             "product_type": parent_doc_for_payload.item_group or "",
             "sku": parent_doc_for_payload.item_code if not parent_doc_for_payload.has_variants else None,
             "variants": [],
-            "images": [],
+            # "images": [],
             "options": [],
         }
     }
@@ -521,7 +521,7 @@ def send_item_to_shopify(doc, method):
                 "product_type": item_triggering_sync.item_group or "",
                 "sku": item_triggering_sync.item_code,
                 "variants": [],
-                "images": [],
+                # "images": [],
             }
         }
         variant_data = {
