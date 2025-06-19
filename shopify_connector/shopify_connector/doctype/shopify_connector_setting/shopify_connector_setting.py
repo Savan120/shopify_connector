@@ -214,6 +214,7 @@ def sync_shopify_locations():
     url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/locations.json"
 
     response = requests.get(url, headers=headers, verify=False)
+    print(response.json())
     if response.status_code == 200:
         locations = response.json().get("locations", [])
 
@@ -227,17 +228,19 @@ def sync_shopify_locations():
         for location in locations:
             shopify_id = str(location.get("id"))
             warehouse_name = location.get("name")
+            
 
             if shopify_id not in existing_ids:
                 shopify_keys.append("warehouse_setting", {
                     "shopify_id": shopify_id,
-                    "shopify_warehouse": warehouse_name
+                    "shopify_warehouse": warehouse_name,
+                    "location_status": "Active" if location.get("active") == True else "Deactive"
                 })
                 
                 existing_ids.add(shopify_id)
         shopify_keys.delivery_after_days = 20
         shopify_keys.flags.ignore_validate = True
-        shopify_keys.save()
+        shopify_keys.save() 
 
     else:
         frappe.log_error("Failed to fetch locations from Shopify")

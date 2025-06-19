@@ -140,7 +140,7 @@ doc_events = {
     "Item": {
         "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
-    },
+    }
     # "Sales Order":{
     #     "before_validate": "shopify_connector.shopify_connector.customisation.sales_order.sales_order.before_validate"
     # },
@@ -153,6 +153,13 @@ doc_events = {
 
 # Scheduled Tasks
 # ---------------
+scheduler_events = {
+    "cron": {
+        "*/5 * * * *": [
+            "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.update_inventory_on_shopify"
+        ]
+    }
+}
 
 # scheduler_events = {
 # 	"* * * * *": [

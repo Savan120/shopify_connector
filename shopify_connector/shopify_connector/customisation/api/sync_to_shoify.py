@@ -606,3 +606,96 @@ def send_item_to_shopify(doc, method):
 ###################################################################################################
 
 
+from shopify_connector.controllers.scheduling import need_to_run
+from shopify_connector.constants import SETTING_DOCTYPE
+
+def update_inventory_on_shopify() -> None:
+    """Upload stock levels from ERPNext to Shopify. Called by scheduler."""
+    
+    setting = frappe.get_doc(SETTING_DOCTYPE)
+
+    if not setting.update_erpnext_stock_levels_to_shopify:
+        return
+
+    if not need_to_run(SETTING_DOCTYPE, "inventory_sync_frequency", "last_inventory_sync"):
+        return
+
+    bins = frappe.get_all("Bin", filters={
+        "modified": [">", setting.last_inventory_sync]
+    }, fields=["name"])
+    
+    for bin_data in bins:
+        try:
+            bin_doc = frappe.get_doc("Bin", bin_data.name)
+            enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_inventory_to_shopify", queue="long", doc=bin_doc, job_name = "Sync Inventory to Shopify")
+            send_inventory_to_shopify(bin_doc)
+        except Exception as e:
+            frappe.log_error(f"Error syncing bin {bin_doc.name}: {str(e)}", "Shopify Inventory Sync")
+
+
+def send_inventory_to_shopify(bin_doc, method=None):
+    
+    connector_settings = frappe.get_single(SETTING_DOCTYPE)
+
+    item_code = bin_doc.item_code
+    warehouse = bin_doc.warehouse
+    actual_qty = bin_doc.actual_qty
+    reserved_qty = bin_doc.reserved_qty
+
+    available_qty = actual_qty - reserved_qty
+    if available_qty < 0:
+        available_qty = 0
+
+    item = frappe.get_doc("Item", {"item_code": item_code})
+
+    inventory_item_id = item.get("custom_inventory_item_id")
+
+    if not inventory_item_id:
+        print("No inventory_item_id found. Exiting...")
+        return
+
+    warehouse_setting = connector_settings.get("warehouse_setting", [])
+
+    shopify_location_id = None
+    for row in warehouse_setting:
+        if (row.erpnext_warehouse or '').strip() == (warehouse or '').strip():
+            shopify_location_id = row.shopify_id
+            break
+
+    if not shopify_location_id:
+        frappe.log_error(f"Shopify Location ID not found for warehouse {warehouse}", "Shopify Inventory Sync")
+        return
+
+    api_key = connector_settings.api_key
+    access_token = connector_settings.access_token
+    shop_url = connector_settings.shop_url
+    api_version = connector_settings.shopify_api_version
+    
+    url = f"https://{api_key}:{access_token}@{shop_url}/admin/api/{api_version}/inventory_items/{inventory_item_id}.json"
+
+    payload = {
+        "inventory_item": {
+            "id": inventory_item_id,
+            "tracked": True
+        }
+    }
+
+    response = requests.put(url, json=payload, verify=False)
+
+
+    url = f"https://{api_key}:{access_token}@{shop_url}/admin/api/{api_version}/inventory_levels/set.json"
+    payload = {
+        "location_id": shopify_location_id,
+        "inventory_item_id": inventory_item_id,
+        "available": int(available_qty)
+    }
+
+    try:
+        response = requests.post(url, json=payload, verify=False)
+        if response.status_code not in [200, 201]:
+            frappe.log_error(title=f"Shopify inventory update failed:",message= {response.status_code} - {response.text})
+        else:
+            frappe.log_error(title="Shopify inventory update successful.", message=f"{response.json()}")
+
+    except Exception as e:
+        frappe.log_error(str(e), "Shopify Inventory Sync")
