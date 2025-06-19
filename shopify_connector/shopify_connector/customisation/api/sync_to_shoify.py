@@ -13,11 +13,9 @@ def validate_api_path():
         return False
     return True
 
-def enqueue_send_customer_to_shopify(doc, method):
-    enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
+# def enqueue_send_customer_to_shopify(doc, method):
+#     enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
 
-def send_customer_to_shopify_hook_delayed(doc,method):
-    send_customer_to_shopify_hook(doc, "after_insert")
     
     
 #! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_customer_to_shopify_hook>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.
