@@ -7,7 +7,6 @@ from frappe.utils.background_jobs import enqueue
 
 def validate_api_path():
     url = frappe.request.url
-    print(url,"||||||||||||||||||||||||||||||||||||")
     path = url.split("//")[1].split("/")[-1] if "//" in url else url.split("/", 1)[-1]
     endpoint_key = path.split("/")[0] if path else ""
     if endpoint_key != "frappe.desk.form.save.savedocs":
@@ -305,18 +304,18 @@ def delete_customer_from_shopify(doc, method):
         frappe.log_error(f"Failed to delete customer from Shopify: {response.text}", "Shopify Customer Delete Error")
 
 
-#!>>>>>>>>>>>>>>>>>>>>>>>>>get_current_domain_name>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#!>>>>>>>>>>>>>>>>>>>>>>>>>To Get Current Host URLs>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     
-def get_current_domain_name() -> str:
-    if hasattr(frappe.local, 'request') and frappe.local.request:
-        return frappe.local.request.host
-    else:
-        if frappe.conf.developer_mode and frappe.conf.localtunnel_url:
-            return frappe.conf.localtunnel_url
-        elif frappe.conf.get('host_name'):
-            return frappe.conf.get('host_name')
-        else:
-            return "localhost"
+# def get_current_domain_name() -> str:
+#     if hasattr(frappe.local, 'request') and frappe.local.request:
+#         return frappe.local.request.host
+#     else:
+#         if frappe.conf.developer_mode and frappe.conf.localtunnel_url:
+#             return frappe.conf.localtunnel_url
+#         elif frappe.conf.get('host_name'):
+#             return frappe.conf.get('host_name')
+#         else:
+#             return "localhost"
 
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -324,7 +323,6 @@ def send_item_to_shopify(doc, method):
     from_desk = validate_api_path()
     if not from_desk:
         return
-
 
     shopify_keys = frappe.get_single("Shopify Connector Setting")
     if not shopify_keys.sync_product and not doc.custom_send_to_shopify:
@@ -347,7 +345,7 @@ def send_item_to_shopify(doc, method):
     if not parent_doc_for_payload or not parent_doc_for_payload.custom_send_to_shopify:
         return
 
-    site_url = get_current_domain_name()
+    # site_url = get_current_domain_name()
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
@@ -355,17 +353,17 @@ def send_item_to_shopify(doc, method):
 
     product_shopify_id_to_update = parent_doc_for_payload.shopify_id
 
-    image_url = ""
-    if parent_doc_for_payload.image:
-        if not site_url.startswith("http"):
-            site_url = "https://" + site_url
-        image_url = site_url + parent_doc_for_payload.image
-    elif parent_doc_for_payload.has_variants or parent_doc_for_payload.name != item_triggering_sync.name:
-        variants = frappe.get_all("Item", filters={"variant_of": parent_doc_for_payload.name}, fields=["image"])
-        for variant in variants:
-            if variant.image:
-                image_url = site_url + variant.image if not variant.image.startswith("http") else variant.image
-                break
+    # image_url = ""
+    # if parent_doc_for_payload.image:
+    #     if not site_url.startswith("http"):
+    #         site_url = "https://" + site_url
+    #     image_url = site_url + parent_doc_for_payload.image
+    # elif parent_doc_for_payload.has_variants or parent_doc_for_payload.name != item_triggering_sync.name:
+    #     variants = frappe.get_all("Item", filters={"variant_of": parent_doc_for_payload.name}, fields=["image"])
+    #     for variant in variants:
+    #         if variant.image:
+    #             image_url = site_url + variant.image if not variant.image.startswith("http") else variant.image
+    #             break
     
 
     product_payload = {
@@ -380,8 +378,8 @@ def send_item_to_shopify(doc, method):
             "options": [],
         }
     }
-    if image_url:
-        product_payload["product"]["images"].append({"src": image_url})
+    # if image_url:
+    #     product_payload["product"]["images"].append({"src": image_url})
 
     if frappe_template_item_name:
         all_variant_items_from_frappe = frappe.get_all(
@@ -417,7 +415,7 @@ def send_item_to_shopify(doc, method):
                 existing_shopify_variants_map[sv["sku"]] = sv
 
         variants_to_send_to_shopify = []
-        images_to_send_to_shopify = []
+        # images_to_send_to_shopify = []
         position_counter = 1
 
         for variant_frappe in all_variant_items_from_frappe:
@@ -426,22 +424,22 @@ def send_item_to_shopify(doc, method):
 
             variant_doc = frappe.get_doc("Item", variant_frappe["name"])
 
-            variant_ids = set()
+            # variant_ids = set()
 
-            variants = frappe.get_all(
-                "Item",
-                filters={
-                    "variant_of": variant_doc.variant_of,
-                    "image": ["!=", ""]
-                },
-                fields=["custom_variant_id"]
-            )
+            # variants = frappe.get_all(
+            #     "Item",
+            #     filters={
+            #         "variant_of": variant_doc.variant_of,
+            #         "image": ["!=", ""]
+            #     },
+            #     fields=["custom_variant_id"]
+            # )
 
-            for variant in variants:
-                if variant.custom_variant_id:
-                    variant_ids.add(variant.custom_variant_id)
+            # for variant in variants:
+            #     if variant.custom_variant_id:
+            #         variant_ids.add(variant.custom_variant_id)
 
-            variant_ids = list(variant_ids)
+            # variant_ids = list(variant_ids)
 
                                 
             attributes = frappe.get_all(
@@ -476,30 +474,28 @@ def send_item_to_shopify(doc, method):
                 variant_data["id"] = existing_shopify_variants_map[variant_frappe["item_code"]]["id"]
                 frappe.db.set_value("Item", variant_frappe["name"], "custom_variant_id", variant_data["id"])
 
-            variants_to_send_to_shopify.append(variant_data)
+            variants_to_send_to_shopify.append(variant_data)            
             
-            print(variant_doc.image)
-            
-            
-            if variant_doc.image and variant_doc.custom_variant_id:
-                if variant_doc.image.startswith("https://"):
-                    variant_image_url = variant_doc.image
-                else:
-                    variant_image_url = site_url + variant_doc.image
+        #     if variant_doc.image and variant_doc.custom_variant_id:
+        #         if variant_doc.image.startswith("https://"):
+        #             variant_image_url = variant_doc.image
+        #         else:
+        #             variant_image_url = site_url + variant_doc.image
 
-                image_payload = {
-                    "src": variant_image_url,
-                    "variant_ids": [variant_doc.custom_variant_id]
-                }
+        #         image_payload = {
+        #             "src": variant_image_url,
+        #             "variant_ids": [variant_doc.custom_variant_id]
+        #         }
 
-                existing_srcs = [img.get("src") for img in images_to_send_to_shopify]
-                existing_payload_srcs = [img.get("src") for img in product_payload["product"].get("images", [])]
-                if variant_image_url not in existing_srcs and variant_image_url not in existing_payload_srcs:
-                    images_to_send_to_shopify.append(image_payload)    
-
+        #         existing_srcs = [img.get("src") for img in images_to_send_to_shopify]
+        #         existing_payload_srcs = [img.get("src") for img in product_payload["product"].get("images", [])]
+        #         if variant_image_url not in existing_srcs and variant_image_url not in existing_payload_srcs:
+        #             images_to_send_to_shopify.append(image_payload)
                         
-        product_payload["product"]["images"].extend(images_to_send_to_shopify)
+        # product_payload["product"]["images"].extend(images_to_send_to_shopify)
         product_payload["product"]["variants"] = variants_to_send_to_shopify
+        
+        
 
         for attr in attribute_order:
             if option_map[attr]:
@@ -554,9 +550,9 @@ def send_item_to_shopify(doc, method):
             "namespace": "custom",
             "key": "hsn",
             "value": str([int(hsn_code)]),
-            # "value": int(hsn_code),
-            # "type": "number_integer"
-            "type":"list.number_integer"
+            # "value": int(hsn_code),           #* Use this when you are trying in your develop shopify app
+            # "type": "number_integer"          #* Use this when you are trying in your develop shopify app
+            "type":"list.number_integer" 
         },
         {
             "namespace": "custom",
@@ -565,13 +561,16 @@ def send_item_to_shopify(doc, method):
             "type": "single_line_text_field"
         }
     ]
+    
+    
+    
     if product_shopify_id_to_update:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"
         response = requests.put(url, json=product_payload, verify=False)
     else:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
-
+        
     if response.status_code in [200, 201]:
         shopify_product = response.json()["product"]
         if frappe_template_item_name:

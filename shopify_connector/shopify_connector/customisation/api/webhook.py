@@ -876,10 +876,8 @@ def product_update():
 
     variants = product_data.get("variants", [])
     images = product_data.get("images", [])
-    print(images)
     is_default_title_only = len(options) == 1 and options[0].get("name") == "Title" and options[0].get("values") == ["Default Title"]
     item_doc_name = frappe.db.exists("Item", {"shopify_id": product_id})
-    print(item_doc_name)
 
     if not item_doc_name:
         item = frappe.new_doc("Item")
@@ -900,6 +898,16 @@ def product_update():
         item = frappe.get_doc("Item", item_doc_name)
 
     if images:
+        if item.image:
+            exist_img = frappe.get_all("File", {
+                "file_url": item.image,
+                "attached_to_doctype": "Item",
+                "attached_to_name": item.name
+            }, pluck="name")
+            
+            for imgs in exist_img:
+                frappe.delete_doc("File", imgs, ignore_permissions=True)
+                
         img_link = images[0].get("src")
         if img_link:
             file_doc_name = frappe.db.exists("File", {"file_url": img_link})
@@ -925,7 +933,6 @@ def product_update():
             for file_name in files:
                 frappe.delete_doc("File", file_name, ignore_permissions=True)
             item.image = None
-            item.save()
 
     item.item_code = product_data.get("title")
     item.item_name = product_data.get("title")
@@ -942,7 +949,6 @@ def product_update():
     if is_default_title_only:
         item.has_variants = 0
         item.set("attributes", [])
-        item.save()
         existing_variants = frappe.get_list("Item", filters={"variant_of": item.name})
         for v in existing_variants:
             try:
@@ -1040,7 +1046,7 @@ def product_update():
                         variant.append("attributes", {"attribute": options[i]["name"], "attribute_value": val})
 
             variant.flags.ignore_permissions = True
-            variant.save()
+
             variant_image_id = v.get("image_id")
             variant_image_url = shopify_images_map.get(variant_image_id)
             if variant_image_id is None:
@@ -1053,7 +1059,7 @@ def product_update():
                     for file_name in files:
                         frappe.delete_doc("File", file_name, ignore_permissions=True)
                 variant.image = None
-                variant.save()
+
             else:
                 if variant_image_url:
                     file_doc_name = frappe.db.exists("File", {"file_url": variant_image_url})
@@ -1098,6 +1104,7 @@ def get_hsn_from_metafields(product_data, settings):
             if metafield.get('key') == 'hsn':
                 hsn_code = metafield.get('value')
                 if hsn_code:
+                    #* Comment this Try and Except if you are trying in your local shopify app
                     try:
                         hsn_code = json.loads(hsn_code)[0]
                     except (json.JSONDecodeError, IndexError, TypeError):

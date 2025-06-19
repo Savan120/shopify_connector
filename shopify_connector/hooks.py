@@ -141,12 +141,12 @@ doc_events = {
         "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
     },
-    "Sales Order":{
-        "before_validate": "shopify_connector.shopify_connector.customisation.sales_order.sales_order.before_validate"
-    },
-    "Sales Order":{
-        "after_insert":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_draft_order"
-    },
+    # "Sales Order":{
+    #     "before_validate": "shopify_connector.shopify_connector.customisation.sales_order.sales_order.before_validate"
+    # },
+    # "Sales Order":{
+    #     "after_insert":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_draft_order"
+    # },
 }
 
 
