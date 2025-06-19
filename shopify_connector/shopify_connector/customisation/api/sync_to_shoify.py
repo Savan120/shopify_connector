@@ -632,7 +632,7 @@ def update_inventory_on_shopify() -> None:
 
 
 def send_inventory_to_shopify(bin_doc, method=None):
-    
+        
     connector_settings = frappe.get_single(SETTING_DOCTYPE)
 
     item_code = bin_doc.item_code
@@ -642,7 +642,7 @@ def send_inventory_to_shopify(bin_doc, method=None):
 
     available_qty = actual_qty - reserved_qty
     if available_qty < 0:
-        available_qty = 0
+        available_qty = 0  
 
     item = frappe.get_doc("Item", {"item_code": item_code})
 
@@ -697,3 +697,17 @@ def send_inventory_to_shopify(bin_doc, method=None):
 
     except Exception as e:
         frappe.log_error(str(e), "Shopify Inventory Sync")
+        
+        
+
+def item_on_update_sync_inventory(doc, method=None):
+    bins = frappe.get_all("Bin", filters={"item_code": doc.item_code}, fields=["name"])
+    if not bins:
+        frappe.log_error(title="Send Invenotry to Shopify", message="Not Bin Record Fetch on Updated item")
+        return
+    for bin_row in bins:
+        try:
+            bin_doc = frappe.get_doc("Bin", bin_row.name)
+            send_inventory_to_shopify(bin_doc)
+        except Exception as e:
+            frappe.log_error(f"Error syncing bin {bin_row.name}: {str(e)}", "Shopify Inventory Sync - Item Update")
