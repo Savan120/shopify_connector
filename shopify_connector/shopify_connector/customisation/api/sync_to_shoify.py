@@ -651,7 +651,7 @@ def send_inventory_to_shopify(bin_doc, method=None):
     inventory_item_id = item.get("custom_inventory_item_id")
 
     if not inventory_item_id:
-        print("No inventory_item_id found. Exiting...")
+        frappe.log_error(title= "No inventory_item_id found. Exiting...", message=f"{item}")
         return
 
     warehouse_setting = connector_settings.get("warehouse_setting", [])
