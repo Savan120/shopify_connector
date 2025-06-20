@@ -703,10 +703,16 @@ def product_creation():
         order_data = frappe.parse_json(request_body.decode("utf-8"))
         product_id = order_data.get("id")
         inventory_item_id = None
+        variants = order_data.get("variants", [])
         item_code = ""
-        for v in order_data.get("variants", []):
+        continue_selling_if_not_stock = False
+        if variants[0].get("inventory_policy") == "continue":
+            continue_selling_if_not_stock = True
+        
+        for v in variants:
             item_code = v.get("sku")
             inventory_item_id = v.get("inventory_item_id")
+            
 
         status = False
         price = 0
@@ -738,6 +744,7 @@ def product_creation():
         item.item_code = order_data.get("title")
         item.item_name = order_data.get("title")
         item.gst_hsn_code = hsn_code
+        item.custom_continue_selling_when_out_of_stock = continue_selling_if_not_stock
         item.description = order_data.get("body_html")
         item.item_group = item_group
         item.stock_uom = uom
@@ -788,7 +795,12 @@ def product_creation():
         image_map = {img.get("id"): img.get("src") for img in images}
 
         if item.has_variants:
+            
             for v in order_data.get("variants", []):
+                continue_selling_if_not_stock_in_variant = False
+                if v.get("inventory_policy") == "continue":
+                    continue_selling_if_not_stock_in_variant = True
+                    
                 variant = frappe.new_doc("Item")
                 variant.item_code = v.get("sku")
                 variant.item_name = order_data.get("title") + "-" + v.get("title")
@@ -796,6 +808,7 @@ def product_creation():
                 variant.variant_of = item.name
                 variant.stock_uom = uom
                 variant.custom_send_to_shopify = 1
+                variant.custom_continue_selling_when_out_of_stock = continue_selling_if_not_stock_in_variant
                 variant.shopify_selling_rate = v.get("price")
                 variant.custom_variant_id = v.get("id")
                 variant.gst_hsn_code = hsn_code
@@ -861,6 +874,7 @@ def product_update():
         frappe.throw(_("Unauthorized: Invalid webhook signature."), frappe.PermissionError)
 
     product_data = json.loads(raw_request_body.decode("utf-8"))
+    
     product_id = product_data.get("id")
     options = product_data.get("options", [])
     item_group = product_data.get("product_type") or settings.item_group
@@ -875,6 +889,10 @@ def product_update():
         item_group_doc.save()
 
     variants = product_data.get("variants", [])
+    continue_selling_if_not_stock = False
+    if variants[0].get("inventory_policy") == "continue":
+        continue_selling_if_not_stock = True
+        
     images = product_data.get("images", [])
     is_default_title_only = len(options) == 1 and options[0].get("name") == "Title" and options[0].get("values") == ["Default Title"]
     item_doc_name = frappe.db.exists("Item", {"shopify_id": product_id})
@@ -884,6 +902,7 @@ def product_update():
         item.shopify_id = product_id
         if variants:
             item.shopify_selling_rate = variants[0].get("price") or 0.0
+        item.custom_continue_selling_when_out_of_stock = continue_selling_if_not_stock
         item.item_code = product_data.get("title")
         item.item_name = product_data.get("title")
         item.description = product_data.get("body_html")
@@ -939,12 +958,15 @@ def product_update():
     item.description = product_data.get("body_html")
     item.item_group = item_group
     item.stock_uom = uom
+    item.custom_continue_selling_when_out_of_stock = continue_selling_if_not_stock
     item.gst_hsn_code = hsn_code
     item.shopify_id = product_id
     item.custom_send_to_shopify = 1
     item.disabled = product_data.get("status") == "draft"
     if variants:
         item.shopify_selling_rate = variants[0].get("price") or 0.0
+    
+    item.save()
 
     if is_default_title_only:
         item.has_variants = 0
@@ -955,6 +977,7 @@ def product_update():
                 frappe.delete_doc("Item", v.name, ignore_permissions=True)
             except:
                 pass
+    
     else:
         item.has_variants = 1
         new_attr_data = {opt["name"]: sorted(opt["values"]) for opt in options}
@@ -1010,6 +1033,9 @@ def product_update():
         
 
         for v in variants:
+            continue_selling_if_not_stock_in_variant = False
+            if v.get("inventory_policy") == "continue":
+                continue_selling_if_not_stock_in_variant = True
             variant_doc_name = frappe.db.exists("Item", {"custom_variant_id": v.get("id")})
             variant = None
             existing_item_name = None
@@ -1030,6 +1056,7 @@ def product_update():
                 variant.item_code = f"{product_data.get('title')}-{v.get('sku')}"
             variant.item_name = f"{product_data.get('title')}-{v.get('title')}"
             variant.item_group = item_group
+            variant.custom_continue_selling_when_out_of_stock = continue_selling_if_not_stock_in_variant
             variant.variant_of = item.name
             variant.custom_send_to_shopify = True
             variant.stock_uom = item.stock_uom
