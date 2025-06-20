@@ -2,11 +2,17 @@
  "Item": [
   {
    "dt": "Item",
-   "fieldname": "custom_variant_id",
-   "fieldtype": "Data",
-   "insert_after": "custom_inventory_item_id",
-   "is_system_generated": 1,
-   "label": "Variant Id",
+   "fieldname": "custom_continue_selling_when_out_of_stock",
+   "fieldtype": "Check",
+   "insert_after": "custom_column_break_r0f71",
+   "label": "Continue Selling When Out of Stock",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_column_break_r0f71",
+   "fieldtype": "Column Break",
+   "insert_after": "custom_ignore_product_update",
    "module": "Shopify Connector"
   },
   {
@@ -16,6 +22,16 @@
    "insert_after": "shopify_id",
    "is_system_generated": 1,
    "label": "Inventory Item Id",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_variant_id",
+   "fieldtype": "Data",
+   "insert_after": "custom_inventory_item_id",
+   "is_system_generated": 1,
+   "label": "Variant Id",
    "module": "Shopify Connector"
   },
   {
@@ -140,7 +156,17 @@
    "dt": "Item",
    "fieldname": "custom_shopify_ids",
    "fieldtype": "Tab Break",
+   "is_system_generated": 1,
    "label": "Shopify ID's",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "custom_ignore_product_update",
+   "fieldtype": "Check",
+   "insert_after": "custom_variant_id",
+   "is_system_generated": 1,
+   "label": "Ignore Product Update",
    "module": "Shopify Connector"
   },
   {
@@ -181,7 +207,8 @@
    "fieldtype": "Data",
    "is_system_generated": 1,
    "label": "Shopify ID",
-   "module": "Shopify Connector"
+   "module": "Shopify Connector",
+   "read_only": 1
   },
   {
    "dt": "Item",
