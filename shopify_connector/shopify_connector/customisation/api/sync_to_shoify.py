@@ -3,22 +3,19 @@ import requests
 from frappe import _
 import json
 from frappe.utils.background_jobs import enqueue
+from shopify_connector.controllers.scheduling import need_to_run
+from shopify_connector.constants import SETTING_DOCTYPE
 
 
 def validate_api_path():
     url = frappe.request.url
     path = url.split("//")[1].split("/")[-1] if "//" in url else url.split("/", 1)[-1]
     endpoint_key = path.split("/")[0] if path else ""
-    if endpoint_key in ["frappe.desk.form.save.savedocs", "frappe.desk.doctype.bulk_update.bulk_update.submit_cancel_or_update_docs"]:
-        return True
-    return False
+    if endpoint_key != "frappe.desk.form.save.savedocs":
+        return False
+    return True
 
-def enqueue_send_customer_to_shopify(doc, method):
-    enqueue("shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook_delayed", queue="default", timeout=300, doc=doc, enqueue_after_commit=True)
 
-def send_customer_to_shopify_hook_delayed(doc,method):
-    send_customer_to_shopify_hook(doc, "after_insert")
-    
     
 #! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_customer_to_shopify_hook>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.
 def send_customer_to_shopify_hook(doc, method):
@@ -304,18 +301,18 @@ def delete_customer_from_shopify(doc, method):
         frappe.log_error(f"Failed to delete customer from Shopify: {response.text}", "Shopify Customer Delete Error")
 
 
-#!>>>>>>>>>>>>>>>>>>>>>>>>>get_current_domain_name>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+#!>>>>>>>>>>>>>>>>>>>>>>>>>To Get Current Host URLs>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     
-def get_current_domain_name() -> str:
-    if hasattr(frappe.local, 'request') and frappe.local.request:
-        return frappe.local.request.host
-    else:
-        if frappe.conf.developer_mode and frappe.conf.localtunnel_url:
-            return frappe.conf.localtunnel_url
-        elif frappe.conf.get('host_name'):
-            return frappe.conf.get('host_name')
-        else:
-            return "localhost"
+# def get_current_domain_name() -> str:
+#     if hasattr(frappe.local, 'request') and frappe.local.request:
+#         return frappe.local.request.host
+#     else:
+#         if frappe.conf.developer_mode and frappe.conf.localtunnel_url:
+#             return frappe.conf.localtunnel_url
+#         elif frappe.conf.get('host_name'):
+#             return frappe.conf.get('host_name')
+#         else:
+#             return "localhost"
 
 
 #!>>>>>>>>>>>>>>>>>>>>>>>>>>>>send_item_to_shopify>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -324,9 +321,8 @@ def send_item_to_shopify(doc, method):
     if not from_desk:
         return
 
-
     shopify_keys = frappe.get_single("Shopify Connector Setting")
-    if not shopify_keys.sync_product:
+    if not shopify_keys.sync_product and not doc.custom_send_to_shopify:
         return
 
     item_triggering_sync = frappe.get_doc("Item", doc.name)
@@ -346,26 +342,28 @@ def send_item_to_shopify(doc, method):
     if not parent_doc_for_payload or not parent_doc_for_payload.custom_send_to_shopify:
         return
 
-    site_url = get_current_domain_name()
+    # site_url = get_current_domain_name()
     SHOPIFY_API_KEY = shopify_keys.api_key
     SHOPIFY_ACCESS_TOKEN = shopify_keys.access_token
     SHOPIFY_STORE_URL = shopify_keys.shop_url
     SHOPIFY_API_VERSION = shopify_keys.shopify_api_version
 
     product_shopify_id_to_update = parent_doc_for_payload.shopify_id
+    inventory_policy = (
+        "continue" if parent_doc_for_payload.custom_continue_selling_when_out_of_stock else "deny"
+    )
 
-    image_url = ""
-    if parent_doc_for_payload.image:
-        if not site_url.startswith("http"):
-            site_url = "https://" + site_url
-        image_url = site_url + parent_doc_for_payload.image
-    elif parent_doc_for_payload.has_variants or parent_doc_for_payload.name != item_triggering_sync.name:
-        variants = frappe.get_all("Item", filters={"variant_of": parent_doc_for_payload.name}, fields=["image"])
-        for variant in variants:
-            if variant.image:
-                image_url = site_url + variant.image if not variant.image.startswith("http") else variant.image
-                break
-    
+    # image_url = ""
+    # if parent_doc_for_payload.image:
+    #     if not site_url.startswith("http"):
+    #         site_url = "https://" + site_url
+    #     image_url = site_url + parent_doc_for_payload.image
+    # elif parent_doc_for_payload.has_variants or parent_doc_for_payload.name != item_triggering_sync.name:
+    #     variants = frappe.get_all("Item", filters={"variant_of": parent_doc_for_payload.name}, fields=["image"])
+    #     for variant in variants:
+    #         if variant.image:
+    #             image_url = site_url + variant.image if not variant.image.startswith("http") else variant.image
+    #             break
 
     product_payload = {
         "product": {
@@ -373,14 +371,16 @@ def send_item_to_shopify(doc, method):
             "body_html": f"<strong>{parent_doc_for_payload.description or ''}</strong>",
             "vendor": parent_doc_for_payload.brand or "Default Vendor",
             "product_type": parent_doc_for_payload.item_group or "",
+            "inventory_policy": inventory_policy,
             "sku": parent_doc_for_payload.item_code if not parent_doc_for_payload.has_variants else None,
             "variants": [],
-            "images": [],
+            # "images": [],
             "options": [],
         }
     }
-    if image_url:
-        product_payload["product"]["images"].append({"src": image_url})
+
+    # if image_url:
+    #     product_payload["product"]["images"].append({"src": image_url})
 
     if frappe_template_item_name:
         all_variant_items_from_frappe = frappe.get_all(
@@ -416,7 +416,7 @@ def send_item_to_shopify(doc, method):
                 existing_shopify_variants_map[sv["sku"]] = sv
 
         variants_to_send_to_shopify = []
-        images_to_send_to_shopify = []
+        # images_to_send_to_shopify = []
         position_counter = 1
 
         for variant_frappe in all_variant_items_from_frappe:
@@ -425,24 +425,23 @@ def send_item_to_shopify(doc, method):
 
             variant_doc = frappe.get_doc("Item", variant_frappe["name"])
 
-            variant_ids = set()
+            # variant_ids = set()
 
-            variants = frappe.get_all(
-                "Item",
-                filters={
-                    "variant_of": variant_doc.variant_of,
-                    "image": ["!=", ""]
-                },
-                fields=["custom_variant_id"]
-            )
+            # variants = frappe.get_all(
+            #     "Item",
+            #     filters={
+            #         "variant_of": variant_doc.variant_of,
+            #         "image": ["!=", ""]
+            #     },
+            #     fields=["custom_variant_id"]
+            # )
 
-            for variant in variants:
-                if variant.custom_variant_id:
-                    variant_ids.add(variant.custom_variant_id)
+            # for variant in variants:
+            #     if variant.custom_variant_id:
+            #         variant_ids.add(variant.custom_variant_id)
 
-            variant_ids = list(variant_ids)
+            # variant_ids = list(variant_ids)
 
-                                
             attributes = frappe.get_all(
                 "Item Variant Attribute",
                 filters={"parent": variant_doc.name},
@@ -456,14 +455,14 @@ def send_item_to_shopify(doc, method):
 
             values = [attr_dict.get(attr) for attr in attribute_order]
             values += [None] * (3 - len(values))
-
+            variant_inventory_policy = "continue" if variant_doc.custom_continue_selling_when_out_of_stock else "deny"
             variant_data = {
                 "option1": values[0],
                 "option2": values[1],
                 "option3": values[2],
                 "price": variant_doc.shopify_selling_rate or 0.0,
                 "sku": variant_doc.item_code,
-                "inventory_policy": "deny",
+                "inventory_policy": variant_inventory_policy,
                 "taxable": True,
                 "position": position_counter,
             }
@@ -476,23 +475,24 @@ def send_item_to_shopify(doc, method):
                 frappe.db.set_value("Item", variant_frappe["name"], "custom_variant_id", variant_data["id"])
 
             variants_to_send_to_shopify.append(variant_data)
-            
-            if variant_doc.image and variant_doc.custom_variant_id:
-                variant_image_url = site_url + variant_doc.image
 
-                image_payload = {
-                    "src": variant_image_url,
-                    "variant_ids": [variant_doc.custom_variant_id]
-                }
+            # if variant_doc.image and variant_doc.custom_variant_id:
+            #     if variant_doc.image.startswith("https://"):
+            #         variant_image_url = variant_doc.image
+            #     else:
+            #         variant_image_url = site_url + variant_doc.image
 
-                existing_srcs = [img.get("src") for img in images_to_send_to_shopify]
-                existing_payload_srcs = [img.get("src") for img in product_payload["product"].get("images", [])]
-                if variant_image_url not in existing_srcs and variant_image_url not in existing_payload_srcs:
-                    images_to_send_to_shopify.append(image_payload)
-                    
+            #     image_payload = {
+            #         "src": variant_image_url,
+            #         "variant_ids": [variant_doc.custom_variant_id]
+            #     }
 
-                        
-        product_payload["product"]["images"].extend(images_to_send_to_shopify)
+            #     existing_srcs = [img.get("src") for img in images_to_send_to_shopify]
+            #     existing_payload_srcs = [img.get("src") for img in product_payload["product"].get("images", [])]
+            #     if variant_image_url not in existing_srcs and variant_image_url not in existing_payload_srcs:
+            #         images_to_send_to_shopify.append(image_payload)
+
+        # product_payload["product"]["images"].extend(images_to_send_to_shopify)
         product_payload["product"]["variants"] = variants_to_send_to_shopify
 
         for attr in attribute_order:
@@ -521,13 +521,13 @@ def send_item_to_shopify(doc, method):
                 "product_type": item_triggering_sync.item_group or "",
                 "sku": item_triggering_sync.item_code,
                 "variants": [],
-                "images": [],
+                # "images": [],
             }
         }
         variant_data = {
             "price": item_triggering_sync.shopify_selling_rate or 0.0,
+            "inventory_policy": inventory_policy,
             "sku": item_triggering_sync.item_code,
-            "inventory_policy": "deny",
             "taxable": True,
         }
         if item_triggering_sync.custom_variant_id:
@@ -535,8 +535,8 @@ def send_item_to_shopify(doc, method):
 
         product_payload["product"]["variants"].append(variant_data)
 
-        if image_url:
-            product_payload["product"]["images"].append({"src": image_url})
+        # if image_url:
+        #     product_payload["product"]["images"].append({"src": image_url})
 
     if parent_doc_for_payload.has_variants and not product_payload["product"]["variants"]:
         return
@@ -548,9 +548,9 @@ def send_item_to_shopify(doc, method):
             "namespace": "custom",
             "key": "hsn",
             "value": str([int(hsn_code)]),
-            # "value": int(hsn_code),
-            # "type": "number_integer"
-            "type":"list.number_integer"
+            # "value": int(hsn_code),           #* Use this when you are trying in your develop shopify app
+            # "type": "number_integer"          #* Use this when you are trying in your develop shopify app
+            "type": "list.number_integer"
         },
         {
             "namespace": "custom",
@@ -559,12 +559,15 @@ def send_item_to_shopify(doc, method):
             "type": "single_line_text_field"
         }
     ]
+
     if product_shopify_id_to_update:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_shopify_id_to_update}.json"
         response = requests.put(url, json=product_payload, verify=False)
     else:
         url = f"https://{SHOPIFY_API_KEY}:{SHOPIFY_ACCESS_TOKEN}@{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products.json"
         response = requests.post(url, json=product_payload, verify=False)
+
+    print(response.json())
 
     if response.status_code in [200, 201]:
         shopify_product = response.json()["product"]
@@ -594,245 +597,120 @@ def send_item_to_shopify(doc, method):
                     except Exception as e:
                         frappe.log_error(f"Failed to set variant/inventory ID for SKU {sku} (Frappe item: {frappe_variant_item_name}): {str(e)}", "Shopify Sync")
     else:
-        frappe.log_error(title=f"Failed to sync product {parent_doc_for_payload.name} to Shopify", message= f"Status {response.status_code} - {response.text}")
+        frappe.log_error(title=f"Failed to sync product {parent_doc_for_payload.name} to Shopify", message=f"Status {response.status_code} - {response.text}")
         return
 
 
-###################################################################################################
+#!##################################################################################################
 
 
-
-
-# def sync_inventory_to_shopify(doc, method):
-#     shopify_settings = frappe.get_single("Shopify Connector Setting")
-#     if not shopify_settings:
-#         frappe.log_error("Shopify Connector Setting not found", "Shopify Sync Error")
-#         return
-
-#     shopify_url = shopify_settings.shop_url
-#     api_key = shopify_settings.api_key
-#     version = shopify_settings.shopify_api_version
-#     password = shopify_settings.access_token
-#     if not (shopify_url and api_key and password):
-#         frappe.log_error("Shopify API credentials missing", "Shopify Sync Error")
-#         return
-
-#     warehouse = doc.warehouse
-#     item_code = doc.item_code
-#     qty = doc.actual_qty
-
-#     shopify_location_id = None
-#     for mapping in shopify_settings.warehouse_setting:
-#         if mapping.erpnext_warehouse == warehouse:
-#             shopify_location_id = mapping.shopify_id
-#             break
-
-#     if not shopify_location_id:
-#         frappe.log_error(f"No Shopify location mapped for warehouse {warehouse}", "Shopify Sync Error")
-#         return
-
-#     item = frappe.get_doc("Item", item_code)
-#     shopify_variant_id = item.get("custom_variant_id")
-#     if not shopify_variant_id:
-#         frappe.log_error(f"Shopify Variant ID not found for item {item_code}", "Shopify Sync Error")
-#         return
-
-#     url = f"https://{shopify_url}/admin/api/{version}/inventory_levels/set.json"
-#     headers = {
-#         "Content-Type": "application/json",
-#         "Authorization": f"Basic {password}"
-#     }
-#     payload = {
-#         "location_id": shopify_location_id,
-#         "inventory_item_id": shopify_variant_id,
-#         "available": qty
-#     }
-
-#     try:
-#         response = requests.post(url, headers=headers, data=payload)
-#         if response.status_code == 200:
-#             frappe.msgprint(_("Inventory synced successfully to Shopify for item {0} in warehouse {1}").format(item_code, warehouse))
-#         else:
-#             frappe.log_error(f"Failed to sync inventory to Shopify: {response.text}", "Shopify Sync Error")
-#     except Exception as e:
-#         frappe.log_error(f"Error syncing inventory to Shopify: {str(e)}", "Shopify Sync Error")
-
-# def on_update(doc, method):
-#     sync_inventory_to_shopify(doc, method)
-
-# def after_insert(doc, method):
-#     sync_inventory_to_shopify(doc, method)
+def update_inventory_on_shopify() -> None:
+    """Upload stock levels from ERPNext to Shopify. Called by scheduler."""
     
+    setting = frappe.get_doc(SETTING_DOCTYPE)
+
+    if not setting.update_erpnext_stock_levels_to_shopify:
+        return
+
+    if not need_to_run(SETTING_DOCTYPE, "inventory_sync_frequency", "last_inventory_sync"):
+        return
+
+    bins = frappe.get_all("Bin", filters={
+        "modified": [">", setting.last_inventory_sync]
+    }, fields=["name"])
     
-# def shopify_credentials():
-#     doc=frappe.get_single("Shopify Connector Setting")
-#     access_token = doc.access_token
-#     url=doc.shop_url
-#     version = doc.shopify_api_version
-#     shopify_graph_url = f"https://{url}/admin/api/{version}/graphql.json"
-#     return {"access_token":access_token,
-#             "shopify_graph_url":shopify_graph_url}
+    for bin_data in bins:
+        try:
+            bin_doc = frappe.get_doc("Bin", bin_data.name)
+            enqueue(
+                method="shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_inventory_to_shopify",
+                queue="long",
+                job_name="Sync Inventory to Shopify",
+                kwargs={"doc": bin_doc}
+            )
+            send_inventory_to_shopify(bin_doc)
+        except Exception as e:
+            frappe.log_error(f"Error syncing bin {bin_doc.name}: {str(e)}", "Shopify Inventory Sync")
 
 
-# def create_shopify_draft_order(doc, method):
-   
-#     shopify = frappe.get_single("Shopify Connector Setting")
-#     if not shopify.enable_shopify:
-#         return
+def send_inventory_to_shopify(bin_doc=None, **kwargs):
+        
+    connector_settings = frappe.get_single(SETTING_DOCTYPE)
 
-#     headers = {
-#         "Content-Type": "application/json",
-#         "X-Shopify-Access-Token": shopify_credentials().get("access_token")
-#     }
+    item_code = bin_doc.item_code
+    warehouse = bin_doc.warehouse
+    actual_qty = bin_doc.actual_qty
+    reserved_qty = bin_doc.reserved_qty
 
-#     add= frappe.db.get_all("Dynamic Link", filters={"link_doctype": "Customer", "parenttype": "Address","link_name":doc.customer}, fields=["parent"])
-#     address = frappe.get_doc("Address",add[0].parent)
+    available_qty = actual_qty - reserved_qty
+    if available_qty < 0:
+        available_qty = 0  
 
-#     customer = frappe.get_doc("Customer", doc.customer)
-#     shopify_customer_id = customer.shopify_id
-#     if not shopify_customer_id:
-#         frappe.throw("Customer does not have a linked Shopify ID.")
-#     contact= frappe.db.get_all("Dynamic Link", filters={"link_doctype": "Customer", "parenttype": "Contact","link_name":doc.customer}, fields=["parent"])
+    item = frappe.get_doc("Item", {"item_code": item_code})
+
+    inventory_item_id = item.get("custom_inventory_item_id")
+
+    if not inventory_item_id:
+        frappe.log_error(title= "No inventory_item_id found. Exiting...", message=f"{item}")
+        return
+
+    warehouse_setting = connector_settings.get("warehouse_setting", [])
+
+    shopify_location_id = None
+    for row in warehouse_setting:
+        if (row.erpnext_warehouse or '').strip() == (warehouse or '').strip():
+            shopify_location_id = row.shopify_id
+            break
+
+    if not shopify_location_id:
+        frappe.log_error(f"Shopify Location ID not found for warehouse {warehouse}", "Shopify Inventory Sync")
+        return
+
+    api_key = connector_settings.api_key
+    access_token = connector_settings.access_token
+    shop_url = connector_settings.shop_url
+    api_version = connector_settings.shopify_api_version
     
-#     customer_email = frappe.db.get_value("Contact", contact[0].parent, "email_id") if contact else None
+    url = f"https://{api_key}:{access_token}@{shop_url}/admin/api/{api_version}/inventory_items/{inventory_item_id}.json"
+
+    payload = {
+        "inventory_item": {
+            "id": inventory_item_id,
+            "tracked": True
+        }
+    }
+
+    response = requests.put(url, json=payload, verify=False)
 
 
-#     line_items = []
-#     for item in doc.items:
-#         line_item = {}
+    url = f"https://{api_key}:{access_token}@{shop_url}/admin/api/{api_version}/inventory_levels/set.json"
+    payload = {
+        "location_id": shopify_location_id,
+        "inventory_item_id": inventory_item_id,
+        "available": int(available_qty)
+    }
 
-#         items = frappe.get_doc("Item", item)
+    try:
+        response = requests.post(url, json=payload, verify=False)
+        if response.status_code not in [200, 201]:
+            frappe.log_error(title=f"Shopify inventory update failed:",message= {response.status_code} - {response.text})
+        else:
+            frappe.log_error(title="Shopify inventory update successful.", message=f"{response.json()}")
 
-#         if items.custom_variant_id:
-#             line_item["variantId"] = f"gid://shopify/ProductVariant/{items.custom_variant_id}"
-#         else:
-#             line_item["title"] = item.item_name
-#             line_item["originalUnitPrice"] = float(item.rate)
-
-#         line_item["quantity"] = int(item.qty)
-
-#         if item.discount_amount:
-#             line_item["appliedDiscount"] = {
-#                 "description": "Line item discount",
-#                 "value": float(item.discount_percentage or 0),
-#                 "amount": float(item.discount_amount),
-#                 "valueType": "FIXED_AMOUNT",
-#                 "title": "Item Discount"
-#             }
-
-#         line_items.append(line_item)
-
-   
-#     shipping_address = {
-#         "address1": address.address_line1,
-#         "address2": address.address_line2 or "",
-#         "city": address.city ,
-#         "province": address.state,
-#         "country": address.country,
-#         "zip": address.pincode
-#     }
-
-#     billing_address = {
-#         "address1": address.address_line1 or "",
-#         "address2": address.address_line2 or "",
-#         "city": address.city ,
-#         "province": address.state,
-#         "country": address.country,
-#         "zip": address.pincode
-#     }
-
-#     applied_discount = None
-#     if doc.discount_amount or doc.additional_discount_percentage:
-#         applied_discount = {
-#             "description": "Order Discount",
-#             "value": float(doc.additional_discount_percentage or 0),
-#             "amount": float(doc.discount_amount or 0),
-#             "valueType": "PERCENTAGE" if doc.additional_discount_percentage else "FIXED_AMOUNT",
-#             "title": "ERP Discount"
-#         }
-
-  
-#     query = """
-#     mutation draftOrderCreate($input: DraftOrderInput!) {
-#       draftOrderCreate(input: $input) {
-#         draftOrder {
-#           id
-#         }
-#         userErrors {
-#           field
-#           message
-#         }
-#       }
-#     }
-#     """
-
-#     variables = {
-#         "input": {
-#             "customerId": f"gid://shopify/Customer/{shopify_customer_id}",
-#             "note": doc.po_no or "ERPNext Draft Order",
-#             "email": customer_email,
-#             "tags": [doc.status],
-#             "taxExempt": False,
-#             "shippingLine": {
-#                 "title": "Standard Shipping",
-#                 "price": float(0)
-#             },
-#             "shippingAddress": shipping_address,
-#             "billingAddress": billing_address,
-#             "lineItems": line_items
-#         }
-#     }
-
-#     if applied_discount:
-#         variables["input"]["appliedDiscount"] = applied_discount
-
-#     response = requests.post(
-#         shopify_credentials().get("shopify_graph_url"),
-#         headers=headers,
-#         json={"query": query, "variables": variables}
-#     )
-
-#     if response.status_code != 200 or "errors" in response.json():
-#         frappe.log_error("Shopify Draft Order Creation Failed", response.text)
-#         return
-#     abc=response.json().get("data", {})
-#     draft_order = response.json().get("data", {}).get("draftOrderCreate", {}).get("draftOrder")
-#     if draft_order and draft_order.get("id"):
-#         doc.custom_shopify_draft_order_id = draft_order["id"].split("/")[-1]
-#         doc.flags.from_shopify = True
-#         doc.save(ignore_permissions=True)
-#         frappe.msgprint("Shopify draft order created successfully.")
-#     else:
-#         frappe.log_error(" Shopify Draft Order missing ID", response.text)
+    except Exception as e:
+        frappe.log_error(str(e), "Shopify Inventory Sync")
         
         
-        
-        
-# # import pycountry
-# # import unicodedata
 
-# # def clean_name(name):
-# #     return unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('utf-8').lower().strip()
-
-# # def get_country_code(country_name):
-# #     name_clean = clean_name(country_name)
-    
-# #     for country in pycountry.countries:
-# #         if clean_name(country.name) == name_clean:
-# #             return country.alpha_2
-# #     return None
-
-
-# # def get_country_and_state_codes(country_name, state_name):
-# #     country_code = get_country_code(country_name)
-# #     if not country_code:
-# #         return None, None
-
-# #     state_clean = clean_name(state_name)
-
-# #     for subdiv in pycountry.subdivisions.get(country_code=country_code):
-# #         if state_clean in clean_name(subdiv.name):
-# #             state_code = subdiv.code.split('-')[-1]  
-# #             return country_code, state_code
-# #     else:
-# #         return frappe.throw(f"{state_name} not found in {country_name}")
+def item_on_update_sync_inventory(doc, method=None):
+    bins = frappe.get_all("Bin", filters={"item_code": doc.item_code}, fields=["name"])
+    frappe.log_error(title="Total Bin", message=f"{bins}")
+    if not bins:
+        frappe.log_error(title="Send Invenotry to Shopify", message="Not Bin Record Fetch on Updated item")
+        return
+    for bin_row in bins:
+        try:
+            bin_doc = frappe.get_doc("Bin", bin_row.name)
+            send_inventory_to_shopify(bin_doc)
+        except Exception as e:
+            frappe.log_error(f"Error syncing bin {bin_row.name}: {str(e)}", "Shopify Inventory Sync - Item Update")

@@ -1,6 +1,167 @@
 {
  "Customer": [
   {
+   "default": "0",
+   "dt": "Customer",
+   "fieldname": "posa_discount",
+   "fieldtype": "Float",
+   "insert_after": "lead_name",
+   "label": "Discount %",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "posa_referral_code",
+   "fieldtype": "Data",
+   "insert_after": "posa_referral_section",
+   "label": "Referral Code",
+   "module": "Shopify Connector",
+   "no_copy": 1
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "posa_referral_section",
+   "fieldtype": "Section Break",
+   "insert_after": "posa_birthday",
+   "label": "Referral Code",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "posa_referral_company",
+   "fieldtype": "Link",
+   "insert_after": "posa_referral_code",
+   "label": "Referral Company",
+   "module": "Shopify Connector",
+   "no_copy": 1,
+   "options": "Company"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "posa_birthday",
+   "fieldtype": "Date",
+   "insert_after": "contact_html",
+   "label": "Birthday",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_collection_day",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "insert_after": "grade",
+   "label": "Collection Day",
+   "module": "Shopify Connector",
+   "options": "SUNDAY\nMONDAY\nTUESDAY\nWEDNESDAY\nTHURSDAY\nFRIDAY\nSATURDAY"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_discount_applicable",
+   "fieldtype": "Check",
+   "insert_after": "column_break_14",
+   "label": "Discount Applicable",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_report",
+   "fieldtype": "Tab Break",
+   "insert_after": "portal_users",
+   "label": "Report",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_section_break_3qfek",
+   "fieldtype": "Section Break",
+   "insert_after": "email_id",
+   "label": "Transporter",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_trnapoter_",
+   "fieldtype": "Link",
+   "insert_after": "custom_section_break_3qfek",
+   "label": "Trnapoter ",
+   "module": "Shopify Connector",
+   "options": "Supplier"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_column_break_vby3o",
+   "fieldtype": "Column Break",
+   "insert_after": "custom_trnapoter_",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fetch_from": "custom_trnapoter_.supplier_name",
+   "fieldname": "custom_tranporter_name",
+   "fieldtype": "Data",
+   "insert_after": "custom_column_break_vby3o",
+   "label": "Tranporter Name",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "custom_credit_limit",
+   "fieldtype": "Small Text",
+   "insert_after": "custom_collection_day",
+   "label": "CREDIT LIMIT",
+   "module": "Shopify Connector"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "unicommerce_raw_billing_address",
+   "fieldtype": "Text",
+   "hidden": 1,
+   "insert_after": "custom_report",
+   "is_system_generated": 1,
+   "label": "Unicommerce raw billing address",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "unicommerce_customer_code",
+   "fieldtype": "Data",
+   "insert_after": "naming_series",
+   "is_system_generated": 1,
+   "label": "Unicommerce customer code",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "unicommerce_is_cod",
+   "fieldtype": "Check",
+   "insert_after": "unicommerce_customer_code",
+   "is_system_generated": 1,
+   "label": "Is COD?",
+   "module": "Shopify Connector",
+   "read_only": 1
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "grade",
+   "fieldtype": "Select",
+   "insert_after": "customer_group",
+   "is_system_generated": 1,
+   "label": "Grade",
+   "module": "Shopify Connector",
+   "options": "\nA\nB\nC\nD"
+  },
+  {
+   "dt": "Customer",
+   "fieldname": "table_info",
+   "fieldtype": "Section Break",
+   "insert_after": "image",
+   "is_system_generated": 1,
+   "label": "Customer Types",
+   "module": "Shopify Connector"
+  },
+  {
    "dt": "Customer",
    "fieldname": "custom_column_break_l0hid",
    "fieldtype": "Column Break",
@@ -93,167 +254,6 @@
    "label": "Shopify Email",
    "module": "Shopify Connector",
    "read_only": 1
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "table_info",
-   "fieldtype": "Section Break",
-   "insert_after": "image",
-   "is_system_generated": 1,
-   "label": "Customer Types",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "grade",
-   "fieldtype": "Select",
-   "insert_after": "customer_group",
-   "is_system_generated": 1,
-   "label": "Grade",
-   "module": "Shopify Connector",
-   "options": "\nA\nB\nC\nD"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "unicommerce_is_cod",
-   "fieldtype": "Check",
-   "insert_after": "unicommerce_customer_code",
-   "is_system_generated": 1,
-   "label": "Is COD?",
-   "module": "Shopify Connector",
-   "read_only": 1
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "unicommerce_customer_code",
-   "fieldtype": "Data",
-   "insert_after": "naming_series",
-   "is_system_generated": 1,
-   "label": "Unicommerce customer code",
-   "module": "Shopify Connector",
-   "read_only": 1
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "unicommerce_raw_billing_address",
-   "fieldtype": "Text",
-   "hidden": 1,
-   "insert_after": "custom_report",
-   "is_system_generated": 1,
-   "label": "Unicommerce raw billing address",
-   "module": "Shopify Connector",
-   "read_only": 1
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "custom_credit_limit",
-   "fieldtype": "Small Text",
-   "insert_after": "custom_collection_day",
-   "label": "CREDIT LIMIT",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fetch_from": "custom_trnapoter_.supplier_name",
-   "fieldname": "custom_tranporter_name",
-   "fieldtype": "Data",
-   "insert_after": "custom_column_break_vby3o",
-   "label": "Tranporter Name",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "custom_column_break_vby3o",
-   "fieldtype": "Column Break",
-   "insert_after": "custom_trnapoter_",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "custom_trnapoter_",
-   "fieldtype": "Link",
-   "insert_after": "custom_section_break_3qfek",
-   "label": "Trnapoter ",
-   "module": "Shopify Connector",
-   "options": "Supplier"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "custom_section_break_3qfek",
-   "fieldtype": "Section Break",
-   "insert_after": "email_id",
-   "label": "Transporter",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "custom_report",
-   "fieldtype": "Tab Break",
-   "insert_after": "portal_users",
-   "label": "Report",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "custom_discount_applicable",
-   "fieldtype": "Check",
-   "insert_after": "column_break_14",
-   "label": "Discount Applicable",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "custom_collection_day",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "insert_after": "grade",
-   "label": "Collection Day",
-   "module": "Shopify Connector",
-   "options": "SUNDAY\nMONDAY\nTUESDAY\nWEDNESDAY\nTHURSDAY\nFRIDAY\nSATURDAY"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "posa_birthday",
-   "fieldtype": "Date",
-   "insert_after": "contact_html",
-   "label": "Birthday",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "posa_referral_company",
-   "fieldtype": "Link",
-   "insert_after": "posa_referral_code",
-   "label": "Referral Company",
-   "module": "Shopify Connector",
-   "no_copy": 1,
-   "options": "Company"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "posa_referral_section",
-   "fieldtype": "Section Break",
-   "insert_after": "posa_birthday",
-   "label": "Referral Code",
-   "module": "Shopify Connector"
-  },
-  {
-   "dt": "Customer",
-   "fieldname": "posa_referral_code",
-   "fieldtype": "Data",
-   "insert_after": "posa_referral_section",
-   "label": "Referral Code",
-   "module": "Shopify Connector",
-   "no_copy": 1
-  },
-  {
-   "default": "0",
-   "dt": "Customer",
-   "fieldname": "posa_discount",
-   "fieldtype": "Float",
-   "insert_after": "lead_name",
-   "label": "Discount %",
-   "module": "Shopify Connector"
   }
  ]
 }

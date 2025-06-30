@@ -124,10 +124,10 @@ doctype_js = {"Address" : "shopify_connector/customisation/address/address.js"}
 
 doc_events = {
     "Customer": {
-        "validate":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.enqueue_send_customer_to_shopify",
-        "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.enqueue_send_customer_to_shopify",
+        "validate":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
+        "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
         "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_customer_to_shopify_hook",
-        "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_customer_from_shopify",
+        # "on_trash": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.delete_customer_from_shopify",
     },
     "Address": {
         "validate": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.on_address_update",
@@ -139,24 +139,29 @@ doc_events = {
     },
     "Item": {
         "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
-        "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
-    },
-    "Sales Order":{
-        "before_validate": "shopify_connector.shopify_connector.customisation.sales_order.sales_order.before_validate"
-    },
-    "Sales Order":{
-        "after_insert":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_draft_order"
-    },
-    # "Bin": {
-    #     "on_update": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.sync_inventory_to_shopify",
-    #     "after_insert": "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.sync_inventory_to_shopify"
-    # }
+        "on_update": ["shopify_connector.shopify_connector.customisation.api.sync_to_shoify.send_item_to_shopify",
+                      "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.item_on_update_sync_inventory"
+        ]
+    }
+    # "Sales Order":{
+    #     "before_validate": "shopify_connector.shopify_connector.customisation.sales_order.sales_order.before_validate"
+    # },
+    # "Sales Order":{
+    #     "after_insert":"shopify_connector.shopify_connector.customisation.api.sync_to_shoify.create_shopify_draft_order"
+    # },
 }
 
 
 
 # Scheduled Tasks
 # ---------------
+scheduler_events = {
+    "cron": {
+        "*/5 * * * *": [
+            "shopify_connector.shopify_connector.customisation.api.sync_to_shoify.update_inventory_on_shopify"
+        ]
+    }
+}
 
 # scheduler_events = {
 # 	"* * * * *": [

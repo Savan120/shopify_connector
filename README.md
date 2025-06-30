@@ -1,35 +1,80 @@
-## Shopify Connector
+# Shopify Connector for ERPNext
 
-Shopify Integration with ERPNext
+**Shopify Connector** integrates your Shopify store with ERPNext to streamline order processing, inventory management, and product synchronization.
 
+---
 
-#### Quick order processing 
+## 🔧 Features
 
-This integrated solution is developed to easily handle the flow of orders from your shopify platform as when a customer completes purchase of products from your website the order information and details is quickly captured by our connector 
+- **Real-Time Data Sync**  
+  Sync products, inventory levels, and orders between ERPNext and Shopify in real-time.
 
-#### Why to use shopify integration ?
+- **Order Management**  
+  Automatically imports Shopify orders into ERPNext and creates necessary records like Sales Orders and Delivery Notes.
 
-Integrating shopify with ERPNext can bring some of benefits to your business by managing process and improving overall productivity here in this blog we are showcasing  some of helpful features and benefits of integrating shopify to ERPNext 
+- **Inventory Sync**  
+  Keeps stock levels consistent between your ERP and Shopify store.
 
-On-time data synchronisation :- Assure that data such as orders, inventory levels, product information, and customer details and information are correctly synced in real time between Shopify and ERPnext, providing perfect and up-to-date information between both platforms
+- **Product Updates**  
+  Easily push product updates from ERPNext to Shopify.
 
-Order Management: confirm that all the sales transactions are correctly recorded in your ERP system this portion includes order information such as customer information, product purchased details, product pricing, and shipping information of product
+---
 
-Inventory Management: integration allows for real-time sync of inventory leaves between Shopify and ERPNext. this section confirms that inventory information and data are always on time between both platforms, also reducing the risk of overselling products or stock products
+## 🚀 Why Use This?
 
-Sync of Product information: product details like description of the product, images of the product, and availability of product can be synced between Shopify and ERPNext, ensuring availability across both platforms and decreasing the need for manual entry of data
+- **Improved Productivity**  
+  Manage operations more efficiently with fewer manual interventions.
 
-fulfilment of automated orders: by triggering actions like order confirmation emails, invoice generation, and shipping notifications directly from ERPNext by integrating automatically
+- **Data Accuracy**  
+  Avoid errors by maintaining a single source of truth.
 
-Shown sync product info : Display sync product details with count on front view of the page
+- **Fast Order Fulfillment**  
+  Speed up order processing and shipment tracking.
 
-Shown sync order info : Display sync order details with count on front view of the page
+---
 
-Shown sync customer info : Display sync customer details with count on front view of the page
+## 🛠️ Installation
 
-Enable Shopify :  Sync record automatically once click on ‘Enable Shopify‘
+> Ensure ERPNext is installed and running on your server.
 
+1. Clone the repository into your apps folder:
+   ```bash
+   cd ~/frappe-bench/apps
+   git clone https://github.com/your-repo/shopify_connector.git
+   ```
 
-#### License
+2. Add the app to your site:
+   ```bash
+   bench --site your-site-name install-app shopify_connector
+   ```
 
-mit
+3. Run migrations:
+   ```bash
+   bench --site your-site-name migrate
+   ```
+
+---
+
+## ⚙️ Configuration
+
+1. Go to **Shopify Connector Settings** in ERPNext.
+2. Fill in your:
+   - **Shopify API Key**
+   - **Password/Access Token**
+   - **Store URL**
+   - **ERPNext Warehouse mappings**
+3. Enable features like:
+   - Product sync
+   - Inventory sync
+   - Order sync
+4. (Optional) Set up scheduler for automatic syncing.
+
+---
+
+## 🔄 Sync Triggers
+
+- Inventory sync is triggered on stock update (`Bin` doctype).
+- Order import runs on schedule.
+- Product sync can be manual or on item update.
+
+---
