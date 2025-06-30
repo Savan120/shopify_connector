@@ -380,8 +380,8 @@ def customer_creation():
             else:
                 cus.territory = shopify_keys.territory 
             cus.save()
+            address = order_data.get("default_address")
             if order_data.get("default_address").get("province") and order_data.get("default_address").get("zip"):
-                address = order_data.get("default_address")
                 cus_address = frappe.new_doc("Address")
                 cus_address.address_title = cus.customer_name
                 cus_address.shopify_id = address.get("id")
@@ -424,7 +424,7 @@ def customer_creation():
                 cus_contact.append(
                     "phone_nos",
                     {
-                        "phone": order_data.get("phone"),
+                        "phone": order_data.get("phone") or address.get("phone"),
                         "is_primary_phone": 1,
                         "is_primary_mobile_no": 1,
                     },
@@ -636,7 +636,7 @@ def customer_update():
             })
         if order_data.get("phone"):
             contact.append("phone_nos", {
-                "phone": order_data.get("phone"),
+                "phone": order_data.get("phone") or address_data.get("phone"),
                 "is_primary_phone": 1,
                 "is_primary_mobile_no":1
             })
