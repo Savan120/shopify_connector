@@ -703,6 +703,8 @@ def send_inventory_to_shopify(bin_doc=None, **kwargs):
         
 
 def item_on_update_sync_inventory(doc, method=None):
+    if not doc.custom_inventory_item_id:
+        return
     bins = frappe.get_all("Bin", filters={"item_code": doc.item_code}, fields=["name"])
     frappe.log_error(title="Total Bin", message=f"{bins}")
     if not bins:
