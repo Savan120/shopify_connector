@@ -326,6 +326,7 @@ def customer_creation():
                 return
 
         order_data = frappe.parse_json(request_body.decode("utf-8"))
+        print(order_data)
 
         customer_id = order_data.get("id")
         first_name = order_data.get("first_name")
@@ -412,6 +413,8 @@ def customer_creation():
             cus_contact.first_name = address.get("first_name")
             cus_contact.middle_name = address.get("middle_name") or ""
             cus_contact.last_name = address.get("last_name")
+            phone = order_data.get("phone") if order_data.get("phone") else address.get("phone")
+            
             if order_data.get("email"):
                 cus_contact.append(
                     "email_ids",
@@ -420,11 +423,11 @@ def customer_creation():
                         "is_primary": 1,
                     },
                 )
-            if order_data.get("phone"):
+            if phone:
                 cus_contact.append(
                     "phone_nos",
                     {
-                        "phone": order_data.get("phone") or address.get("phone"),
+                        "phone": phone,
                         "is_primary_phone": 1,
                         "is_primary_mobile_no": 1,
                     },
@@ -634,7 +637,8 @@ def customer_update():
                 "email_id": order_data.get("email"),
                 "is_primary": 1,
             })
-        if order_data.get("phone"):
+        phone = order_data.get("phone") if order_data.get("phone") else address_data.get("phone")
+        if phone:
             contact.append("phone_nos", {
                 "phone": order_data.get("phone") or address_data.get("phone"),
                 "is_primary_phone": 1,
@@ -649,6 +653,7 @@ def customer_update():
         frappe.db.set_value("Customer", customer.name, "customer_primary_contact", contact.name)
         contact.save()
     else:
+        phone = order_data.get("phone") if order_data.get("phone") else address_data.get("phone")
         contact.update({
             "first_name": address_data.get("first_name"),
             "middle_name": address_data.get("middle_name") or "",
@@ -659,14 +664,15 @@ def customer_update():
                 "email_id": order_data.get("email"),
                 "is_primary": 1
             }])
-        if order_data.get("phone"):
+        if phone:
             contact.set("phone_nos", [{
-                "phone": order_data.get("phone"),
+                "phone": phone,
                 "is_primary_phone": 1,
                 "is_primary_mobile_no":1
             }])
         contact.flags.ignore_permissions = True
         contact.save()
+        print("contact>>>>>>>>>>>>>>>>>>.",contact.__dict__)
         
         
         
