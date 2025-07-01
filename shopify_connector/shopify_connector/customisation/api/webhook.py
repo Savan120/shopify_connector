@@ -326,7 +326,6 @@ def customer_creation():
                 return
 
         order_data = frappe.parse_json(request_body.decode("utf-8"))
-        print(order_data)
 
         customer_id = order_data.get("id")
         first_name = order_data.get("first_name")
@@ -672,7 +671,6 @@ def customer_update():
             }])
         contact.flags.ignore_permissions = True
         contact.save()
-        print("contact>>>>>>>>>>>>>>>>>>.",contact.__dict__)
         
         
         
